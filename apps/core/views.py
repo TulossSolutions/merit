@@ -1,10 +1,7 @@
 from django.db import connection
 from django.http import JsonResponse, HttpResponse
-from django.conf import settings
 from django.shortcuts import render
-from django.utils.safestring import mark_safe
 from django.views.decorators.cache import cache_page
-import markdown
 from apps.football.models import Position, Season
 from apps.rankings.services.queries import entries, latest_snapshot
 from apps.scoring.models import ScoringFormula
@@ -18,9 +15,7 @@ def health(request):
     return JsonResponse({"status":"ok"})
 def methodology(request): return render(request,"core/methodology.html",{"formula":ScoringFormula.objects.filter(is_active=True).first(),"page_title":"Methodology"})
 def roadmap(request): return render(request,"core/roadmap.html",{"page_title":"Roadmap"})
-def manifesto(request):
-    source=(settings.BASE_DIR/"docs"/"manifest.md").read_text(encoding="utf8")
-    return render(request,"core/manifesto.html",{"manifesto_html":mark_safe(markdown.markdown(source)),"page_title":"Manifesto"})
+def manifesto(request): return render(request,"core/manifesto.html",{"page_title":"Manifesto"})
 def changelog(request): return render(request,"core/changelog.html",{"formulas":ScoringFormula.objects.order_by("-created_at"),"page_title":"Formula changelog"})
 @cache_page(3600)
 def season_archive(request,slug):

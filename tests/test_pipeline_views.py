@@ -47,12 +47,12 @@ def test_public_pages_and_htmx(pipeline):
     assert b'hx-push-url="true"' in fragment.content
 
     manifesto = client.get("/manifesto/")
-    assert b"Merit Manifesto" in manifesto.content
-    assert b"No votes. Just performance." in manifesto.content
-    assert b"You should never have to wonder how the winner was chosen." in manifesto.content
-    assert manifesto.content.count(b"<ul>") == 14
-    assert b"<li>Matches played.</li>" in manifesto.content
-    assert b"<li><strong>Goalkeepers.</strong></li>" in manifesto.content
+    assert b"Most football arguments start the same way." in manifesto.content
+    assert b"truth outruns narrative" in manifesto.content
+    assert b"<strong>Merit</strong>" in manifesto.content
+    assert b"Merit: <em>No votes. Just performance.</em>" in manifesto.content
+    manifesto_body = manifesto.content.split(b'<article class="prose">', 1)[1].split(b"</article>", 1)[0]
+    assert manifesto_body.count(b"<p>") == 14
     roadmap = client.get("/roadmap/")
     assert roadmap.content.count(b"list-disc") == 4
     player = client.get("/players/demo-player-1/")
