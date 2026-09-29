@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils.text import slugify
 from apps.football.models import Competition,CompetitionSeason,Fixture,Player,PlayerFixture,PlayerFixtureMetric,PlayerTeamSeason,Position,Season,Team,TeamCompetitionSeason
 
-METRICS=("goals","assists","shots","shots_on_target","key_passes","passes","accurate_passes","tackles_won","interceptions","clearances","recoveries","duels","aerial_duels","successful_dribbles","goals_conceded","saves","penalties_saved","long_passes","accurate_long_passes","errors_leading_to_goal")
+METRICS=("goals","assists","shots","shots_on_target","key_passes","passes","accurate_passes","tackles_won","interceptions","clearances","recoveries","duels","aerial_duels","successful_dribbles","goals_conceded","saves","penalties_saved","long_passes","accurate_long_passes","errors_leading_to_goal","tackles")
 class Command(BaseCommand):
     @transaction.atomic
     def handle(self,*args,**opts):

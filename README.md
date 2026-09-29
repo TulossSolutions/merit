@@ -30,7 +30,7 @@ pip install -e ".[dev]"
 Copy-Item .env.example .env
 # Create the PostgreSQL database named football_rankings, then load .env values.
 python manage.py migrate
-python manage.py import_scoring_formula scoring_formulas/v1_1.json
+python manage.py import_scoring_formula scoring_formulas/v1_2.json
 python manage.py seed_demo_data
 python manage.py rebuild_elo --season current
 python manage.py recompute_scores --season current --as-of 2026-09-30T23:59:59Z
@@ -54,7 +54,7 @@ python manage.py benchmark_views --samples 50
 
 ## API-Football
 
-Set `FOOTBALL_PROVIDER=api_football`, `API_FOOTBALL_KEY`, and `FORMULA_VERSION=1.1` in the server environment. Never expose the key to the browser. Provider IDs belong in database records; no league, season, team, player, or fixture IDs are guessed. Enable only the six MVP competitions in Admin after `sync_competitions`. The Free plan is quota-limited, so the incremental command records its last successful sync and skips fixtures already processed.
+Set `FOOTBALL_PROVIDER=api_football`, `API_FOOTBALL_KEY`, and `FORMULA_VERSION=1.2` in the server environment. Never expose the key to the browser. Provider IDs belong in database records; no league, season, team, player, or fixture IDs are guessed. Enable only the six MVP competitions in Admin after `sync_competitions`. The Free plan is quota-limited, so the incremental command records its last successful sync and skips fixtures already processed.
 
 ```bash
 python manage.py sync_competitions

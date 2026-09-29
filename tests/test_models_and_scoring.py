@@ -1,4 +1,5 @@
 from datetime import date
+from copy import deepcopy
 from decimal import Decimal
 import json
 import pytest
@@ -8,6 +9,7 @@ from django.test import override_settings
 from django.utils import timezone
 from apps.football.models import PlayerFixture, Season
 from apps.rankings.models import RankingSnapshot
+from apps.rankings.services.queries import latest_snapshot
 from apps.scoring.models import ScoringFormula
 from apps.scoring.services.calculate import average_percentiles
 from apps.scoring.services.context import league_factor, match_context, opponent_factor, stage_factor
@@ -66,3 +68,43 @@ def test_15_percent_successor_preserves_published_v1_formula():
     assert successor.is_active and successor.config == new_config
     assert successor.checksum_sha256 == validate_formula(new_config)
     assert RankingSnapshot.objects.get(pk=snapshot.pk).formula_id == old.pk
+
+def test_v1_2_uses_api_football_tackles_without_changing_weights():
+    with open("scoring_formulas/v1_1.json", encoding="utf8") as handle: old_config = json.load(handle)
+    with open("scoring_formulas/v1_2.json", encoding="utf8") as handle: new_config = json.load(handle)
+    assert new_config["version"] == "1.2"
+    assert len(validate_formula(new_config)) == 64
+    expected = deepcopy(old_config)
+    expected.update(version=new_config["version"], name=new_config["name"], notes=new_config["notes"])
+    for position in ("MID", "DEF"):
+        old_metric = next(metric for metric in old_config["positions"][position]["metrics"] if metric["key"] == "tackles_won_per90")
+        new_metric = next(metric for metric in new_config["positions"][position]["metrics"] if metric["key"] == "tackles_per90")
+        assert new_metric["label"] == "Tackles / 90"
+        assert new_metric["source"] == "tackles"
+        assert new_metric["weight"] == old_metric["weight"]
+        assert new_metric["aggregation"] == old_metric["aggregation"]
+        assert new_metric["direction"] == old_metric["direction"]
+        assert new_metric["context_adjust"] == old_metric["context_adjust"]
+        index = next(index for index, metric in enumerate(expected["positions"][position]["metrics"]) if metric["key"] == "tackles_won_per90")
+        expected["positions"][position]["metrics"][index] = new_metric
+    assert new_config == expected
+    old = ScoringFormula.objects.create(version="1.1", name="15% coverage model", config=old_config, checksum_sha256=validate_formula(old_config), is_active=True)
+    season = Season.objects.create(name="2024/25",slug="tackles-formula",starts_on=date(2024,8,1),ends_on=date(2025,5,31))
+    snapshot = RankingSnapshot.objects.create(season=season,formula=old,published_at=timezone.now(),cutoff_at=timezone.now(),is_public=True)
+    with override_settings(FORMULA_VERSION="1.2"):
+        call_command("import_scoring_formula","scoring_formulas/v1_2.json",verbosity=0)
+    old.refresh_from_db()
+    successor = ScoringFormula.objects.get(version="1.2")
+    assert not old.is_active and successor.is_active
+    assert RankingSnapshot.objects.get(pk=snapshot.pk).formula_id == old.pk
+
+def test_latest_snapshot_prefers_new_publication_at_same_cutoff():
+    with open("scoring_formulas/v1_1.json", encoding="utf8") as handle: old_config = json.load(handle)
+    with open("scoring_formulas/v1_2.json", encoding="utf8") as handle: new_config = json.load(handle)
+    season = Season.objects.create(name="2024/25", slug="same-cutoff", starts_on=date(2024,8,1), ends_on=date(2025,5,31), is_published=True)
+    old = ScoringFormula.objects.create(version="1.1", name="V1.1", config=old_config, checksum_sha256=validate_formula(old_config))
+    new = ScoringFormula.objects.create(version="1.2", name="V1.2", config=new_config, checksum_sha256=validate_formula(new_config), is_active=True)
+    cutoff = timezone.now()
+    RankingSnapshot.objects.create(season=season, formula=old, published_at=cutoff, cutoff_at=cutoff, is_public=True)
+    newest = RankingSnapshot.objects.create(season=season, formula=new, published_at=cutoff, cutoff_at=cutoff, is_public=True)
+    assert latest_snapshot(season).pk == newest.pk

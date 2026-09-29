@@ -5,7 +5,7 @@ from decimal import Decimal
 
 VALID_AGGREGATIONS={"COUNT_PER90","RATE","NEGATIVE_COUNT_PER90","DERIVED_RATE"}
 VALID_DIRECTIONS={"positive","negative"}
-KNOWN_METRICS={"goals_per90","assists_per90","shots_on_target_per90","key_passes_per90","successful_dribbles_per90","duel_win_rate","goal_conversion_rate","accurate_passes_per90","pass_accuracy","interceptions_per90","tackles_won_per90","aerial_duel_win_rate","clearances_per90","recoveries_per90","errors_leading_to_goal_per90","save_percentage","saves_per90","clean_sheet_rate","goals_conceded_per90","penalties_saved_per90","long_pass_accuracy","accurate_long_passes_per90"}
+KNOWN_METRICS={"goals_per90","assists_per90","shots_on_target_per90","key_passes_per90","successful_dribbles_per90","duel_win_rate","goal_conversion_rate","accurate_passes_per90","pass_accuracy","interceptions_per90","tackles_per90","tackles_won_per90","aerial_duel_win_rate","clearances_per90","recoveries_per90","errors_leading_to_goal_per90","save_percentage","saves_per90","clean_sheet_rate","goals_conceded_per90","penalties_saved_per90","long_pass_accuracy","accurate_long_passes_per90"}
 SEMVER=re.compile(r"^\d+\.\d+$")
 
 def canonical_bytes(config): return json.dumps(config,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()

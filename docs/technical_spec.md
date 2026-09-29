@@ -39,7 +39,7 @@ Status is evidence-based: ✅ means implemented and locally verified; ❌ means 
 | 22 | Persisted total context factor | ✅ |
 | 23 | Count, rate, negative, and clean-sheet aggregation | ✅ |
 | 24 | Position cohort and scaled eligibility | ✅ |
-| 25 | 15% metric coverage gating in formula v1.1 (v1.0 retained) | ✅ |
+| 25 | 15% metric coverage gating in formulas v1.1/v1.2 (v1.0 retained) | ✅ |
 | 26 | Deterministic tied percentile scoring | ✅ |
 | 27 | Exact V1 scoring formula | ✅ |
 | 28 | Missing-metric weight renormalization | ✅ |
@@ -56,7 +56,7 @@ Status is evidence-based: ✅ means implemented and locally verified; ❌ means 
 | 39 | Complete player detail and context explanation | ✅ |
 | 40 | Searchable HTMX player comparison controls | ✅ |
 | 41 | Dynamic public methodology | ✅ |
-| 42 | Formula changelog for immutable v1.0 and active v1.1 | ✅ |
+| 42 | Formula changelog for immutable v1.0/v1.1 and active v1.2 | ✅ |
 | 43 | Progressive HTMX navigation and fragments | ✅ |
 | 44 | Local Tailwind implementation | ✅ |
 | 45 | Performance targets and query benchmarks | ✅ |
@@ -83,7 +83,7 @@ Status is evidence-based: ✅ means implemented and locally verified; ❌ means 
 | 66 | Production cron concurrency verification | ❌ (production deferred) |
 | 67 | Initial backfill strategy documentation | ✅ |
 | 68 | Working API-Football raw-payload fixture replay | ✅ |
-| 69 | Immutable formula lifecycle with configured v1.1 selection | ✅ |
+| 69 | Immutable formula lifecycle with configured v1.2 selection | ✅ |
 | 70 | Dedicated methodology-integrity test | ✅ |
 | 71 | Complete reusable component inventory | ✅ |
 | 72 | Empty, eligibility, and missing-value states | ✅ |
@@ -390,7 +390,7 @@ REDIS_URL=redis://127.0.0.1:6379/0
 
 API_FOOTBALL_KEY=
 FOOTBALL_PROVIDER=api_football
-FORMULA_VERSION=1.1
+FORMULA_VERSION=1.2
 API_FOOTBALL_BASE_URL=https://v3.football.api-sports.io
 
 DEFAULT_SEASON_SLUG=2026-27
@@ -1470,7 +1470,7 @@ coverage = players_with_available_metric / cohort_players_with_min_population_mi
 
 Use a minimum population threshold of 180 minutes for coverage analysis.
 
-A v1.1 metric becomes active for that calculation only when:
+A v1.1 or v1.2 metric becomes active for that calculation only when:
 
 ```text
 coverage >= 0.15
@@ -1516,11 +1516,11 @@ No z-score is required in v1.
 
 # 27. V1 scoring formula
 
-The active successor is `/scoring_formulas/v1_1.json`; keep `/scoring_formulas/v1.json` unchanged for historical reproducibility. The active formula has this conceptual schema:
+The active successor is `/scoring_formulas/v1_2.json`; keep `/scoring_formulas/v1.json` and `/scoring_formulas/v1_1.json` unchanged for historical reproducibility. V1.2 replaces the unavailable API-Football `tackles_won` input with the provider's `tackles.total` value; all weights and the 15% coverage gate remain unchanged. The active formula has this conceptual schema:
 
 ```json
 {
-  "version": "1.1",
+  "version": "1.2",
   "coverage_threshold": 0.15,
   "performance_weight": 0.92,
   "availability_weight": 0.08,
@@ -1566,7 +1566,7 @@ assists_per90                  0.10  positive, count, context adjusted
 accurate_passes_per90          0.12  positive, count, context adjusted
 pass_accuracy                  0.08  positive, rate
 interceptions_per90            0.14  positive, count, context adjusted
-tackles_won_per90              0.12  positive, count, context adjusted
+tackles_per90                  0.12  positive, count, context adjusted
 duel_win_rate                  0.10  positive, rate
 successful_dribbles_per90      0.08  positive, count, context adjusted
 goals_per90                    0.10  positive, count, context adjusted
@@ -1581,7 +1581,7 @@ This is intentionally a blended midfielder model in MVP. Separate DM/CM/AM model
 duel_win_rate                  0.18  positive, rate
 aerial_duel_win_rate           0.14  positive, rate
 interceptions_per90            0.16  positive, count, context adjusted
-tackles_won_per90              0.16  positive, count, context adjusted
+tackles_per90                  0.16  positive, count, context adjusted
 clearances_per90               0.10  positive, count, context adjusted
 recoveries_per90               0.10  positive, count, context adjusted
 accurate_passes_per90          0.08  positive, count, context adjusted
@@ -2002,6 +2002,11 @@ Checksum: ...
 v1.1
 Activated: ...
 Notes: Coverage threshold 15%; other scoring weights unchanged.
+Checksum: ...
+
+v1.2
+Activated: ...
+Notes: API-Football tackles.total replaces unavailable tackles won; weights unchanged.
 Checksum: ...
 ```
 
@@ -2443,7 +2448,7 @@ Using recorded/sample JSON fixtures that contain no secrets:
 - negative metrics are not softened by opponent factor
 - rate metrics aggregate numerator/denominator, not average percentages
 - per-90 normalization correct
-- metric coverage below 15% disables metric cohort-wide in v1.1 (85% in archived v1.0)
+- metric coverage below 15% disables metric cohort-wide in v1.1/v1.2 (85% in archived v1.0)
 - disabled weight gets proportionally redistributed
 - negative percentile inverted
 - availability score correct
@@ -2668,7 +2673,7 @@ MVP workflow:
 
 Never make weight changes in Django Admin for an already activated formula.
 
-A future weight change requires e.g. `1.1`.
+A future scoring change requires a new version, e.g. `1.3`.
 
 ---
 
@@ -2875,7 +2880,7 @@ The MVP is considered functionally complete when all are true:
 - [x] ✅ Competition/stage factor is applied as specified.
 - [x] ✅ V1 scoring formula is stored/imported immutably as configured version `1.0`.
 - [x] ✅ Player metrics are aggregated per 90/rate correctly.
-- [x] ✅ Missing cohort metrics are disabled at <15% coverage in v1.1 and weights renormalize; v1.0 snapshots retain their 85% gate.
+- [x] ✅ Missing cohort metrics are disabled at <15% coverage in v1.1/v1.2 and weights renormalize; v1.0 snapshots retain their 85% gate.
 - [x] ✅ Percentiles are calculated within position cohort.
 - [x] ✅ Eligibility minutes scale with season progress.
 - [x] ✅ Availability contributes 8% of final score.
@@ -3029,7 +3034,7 @@ The repository is done when a fresh developer can clone it and, following only t
 13. see the exact scoring methodology,
 14. run the complete test suite successfully.
 
-The same repository must then be switchable to API-Football by setting `API_FOOTBALL_KEY`, `FOOTBALL_PROVIDER=api_football`, and `FORMULA_VERSION=1.1`, then syncing real tracked competitions without changing ranking/business code. Sportmonks remains a future adapter.
+The same repository must then be switchable to API-Football by setting `API_FOOTBALL_KEY`, `FOOTBALL_PROVIDER=api_football`, and `FORMULA_VERSION=1.2`, then syncing real tracked competitions without changing ranking/business code. Sportmonks remains a future adapter.
 
 ---
 

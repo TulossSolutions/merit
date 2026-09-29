@@ -23,8 +23,8 @@ def test_methodology_links_to_github():
 @pytest.fixture
 def pipeline():
     call_command("seed_demo_data", verbosity=0)
-    with open("scoring_formulas/v1.json", encoding="utf8") as handle: config = json.load(handle)
-    formula = ScoringFormula.objects.create(version="1.0", name="V1", config=config, checksum_sha256=validate_formula(config), is_active=True)
+    with open("scoring_formulas/v1_2.json", encoding="utf8") as handle: config = json.load(handle)
+    formula = ScoringFormula.objects.create(version="1.2", name="V1.2", config=config, checksum_sha256=validate_formula(config), is_active=True)
     season = Season.objects.get(is_current=True)
     cutoff = datetime(2026, 9, 30, 23, 59, 59, tzinfo=timezone.utc)
     assert rebuild_elo(season) == 24
@@ -37,6 +37,9 @@ def test_full_pipeline_has_four_cohorts_and_breakdown(pipeline):
     assert snapshot.season.is_published is True
     assert set(snapshot.entries.values_list("position", flat=True)) == {Position.GK, Position.DEF, Position.MID, Position.FWD}
     assert all(score.metric_breakdown for score in scores)
+    defender = snapshot.entries.filter(position=Position.DEF).first()
+    assert defender.metric_breakdown["tackles_per90"]["active"] is True
+    assert defender.metric_breakdown["tackles_per90"]["raw_value"] is not None
 
 def test_public_pages_and_htmx(pipeline):
     client = Client()
@@ -45,6 +48,9 @@ def test_public_pages_and_htmx(pipeline):
     fragment = client.get("/rankings/attackers/", HTTP_HX_REQUEST="true")
     assert b"<html" not in fragment.content
     assert b'hx-push-url="true"' in fragment.content
+    defenders = client.get("/rankings/defenders/")
+    assert b"Tackles / 90" in defenders.content
+    assert b"Tackles won / 90" not in defenders.content
 
     manifesto = client.get("/manifesto/")
     assert b"Most football arguments start the same way." in manifesto.content

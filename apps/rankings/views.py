@@ -11,7 +11,7 @@ from apps.rankings.services.queries import entries,latest_snapshot
 from apps.scoring.models import PlayerSeasonScore
 
 SLUGS={"attackers":Position.FWD,"midfielders":Position.MID,"defenders":Position.DEF,"goalkeepers":Position.GK}
-HEADLINES={Position.FWD:["goals_per90","assists_per90","shots_on_target_per90"],Position.MID:["key_passes_per90","interceptions_per90","pass_accuracy"],Position.DEF:["duel_win_rate","interceptions_per90","tackles_won_per90"],Position.GK:["save_percentage","saves_per90","clean_sheet_rate"]}
+HEADLINES={Position.FWD:["goals_per90","assists_per90","shots_on_target_per90"],Position.MID:["key_passes_per90","interceptions_per90","pass_accuracy"],Position.DEF:["duel_win_rate","interceptions_per90","tackles_per90"],Position.GK:["save_percentage","saves_per90","clean_sheet_rate"]}
 def ranking_index(request): return HttpResponseRedirect(reverse("ranking",args=["attackers"]))
 @cache_page(300)
 @vary_on_headers("HX-Request")
