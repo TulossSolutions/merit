@@ -7,7 +7,7 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
 from apps.football.models import Player, Position, Season
 from apps.rankings.models import RankingEntry
-from apps.rankings.services.queries import entries,latest_snapshot
+from apps.rankings.services.queries import entries,latest_snapshot,present_movement
 from apps.scoring.models import PlayerSeasonScore
 from apps.ingestion.models import PlayerIdentityAlias
 
@@ -23,6 +23,7 @@ def ranking(request,position_slug):
     snapshot=latest_snapshot(season); page=Paginator(entries(snapshot,position)[:100],25).get_page(request.GET.get("page",1)) if snapshot else None
     headline_keys=HEADLINES[position]; headline_labels=[]
     if page:
+        page.object_list=present_movement(page.object_list,snapshot)
         for key in headline_keys:
             metric=next((entry.metric_breakdown.get(key) for entry in page if entry.metric_breakdown.get(key)),None); headline_labels.append(metric.get("label",key) if metric else key.replace("_"," ").title())
         for entry in page: entry.headline_metrics=[entry.metric_breakdown.get(key) for key in headline_keys]
@@ -52,6 +53,7 @@ def player_detail(request,slug):
         entry=next((item for item in public_entries if snapshot and item.snapshot_id==snapshot.pk),None)
         if entry is None and season_history: entry=season_history[0]
     if entry: snapshot=entry.snapshot
+    if entry: present_movement([entry],snapshot)
     selected_season=snapshot.season if snapshot else None
     score=None
     if entry:
@@ -61,7 +63,13 @@ def player_detail(request,slug):
         # Display the frozen publication, never a later or different-season calculation.
         score={"season":snapshot.season,"formula":snapshot.formula,"as_of":snapshot.cutoff_at,"eligible":True,
             "minutes":entry.minutes,"appearances":appearances,"metric_breakdown":entry.metric_breakdown,"context_summary":entry.context_summary}
-    history=[item for item in reversed(public_entries) if entry and item.snapshot.season_id==entry.snapshot.season_id]
+    season_entries=[item for item in public_entries if entry and item.snapshot.season_id==entry.snapshot.season_id]
+    weekly=[item for item in season_entries if item.snapshot.formula_id==entry.snapshot.formula_id
+        and item.snapshot.coverage_summary.get("weekly_replay",{}).get("kind")=="weekly"] if entry else []
+    if weekly: season_entries=weekly+[entry]
+    by_cutoff={}
+    for item in season_entries: by_cutoff.setdefault(item.snapshot.cutoff_at,item)
+    history=[by_cutoff[key] for key in sorted(by_cutoff)]
     chart_points=[]; chart_dates=[]; chart_ranks=[]
     if history:
         low=min(item.rank for item in history); high=max(item.rank for item in history)

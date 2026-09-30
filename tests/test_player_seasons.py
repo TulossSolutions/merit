@@ -91,7 +91,8 @@ def test_selected_season_shows_frozen_contributions_breakdown_and_history(client
     assert response.context["score"]["metric_breakdown"] == player_seasons["old_entry"].metric_breakdown
     assert response.context["score"]["appearances"] is None
     assert all(point["item"].snapshot.season_id == player_seasons["old"].pk for point in response.context["chart_points"])
-    assert len(response.context["chart_points"]) == 3
+    assert len(response.context["chart_points"]) == 2
+    assert [point["item"].rank for point in response.context["chart_points"]] == [4, 2]
     html = response.content.decode()
     assert '<option value="2024-25" selected>2024/25</option>' in html
     assert "Title campaign contribution" in html and "72.75%" in html and "Past Champions" in html

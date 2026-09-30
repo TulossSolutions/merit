@@ -9,11 +9,12 @@ from apps.scoring.models import PlayerSeasonScore
 from apps.scoring.services.formulas import validate_formula
 from apps.scoring.services.quality import check_quality
 from .coverage import snapshot_coverage
+from .queries import previous_snapshot
 
 logger=logging.getLogger(__name__)
 
 @transaction.atomic
-def publish(season,formula,cutoff,force=False,*,allow_unavailable=False):
+def publish(season,formula,cutoff,force=False,*,allow_unavailable=False,weekly_replay=None):
     if validate_formula(formula.config)!=formula.checksum_sha256: raise ValueError("Formula checksum does not match its immutable configuration")
     fatal=[issue for issue in check_quality(season,cutoff,allow_unavailable=allow_unavailable) if issue[0]=="ERROR"]
     if fatal: raise ValueError(f"Fatal data-quality errors block publication: {fatal}")
@@ -22,8 +23,9 @@ def publish(season,formula,cutoff,force=False,*,allow_unavailable=False):
     if existing and force: existing.entries.all().delete(); existing.delete()
     scores=list(PlayerSeasonScore.objects.filter(season=season,formula=formula,as_of=cutoff,eligible=True,final_score__isnull=False).select_related("player").order_by("position","-final_score","-performance_score","-minutes","player_id"))
     if not scores: raise ValueError("No eligible scores exist for the exact cutoff")
-    previous=RankingSnapshot.objects.filter(season=season,is_public=True,cutoff_at__lt=cutoff).order_by("-cutoff_at").first(); old={(e.position,e.player_id):e.rank for e in previous.entries.all()} if previous else {}
+    previous=previous_snapshot(RankingSnapshot(season=season,formula=formula,cutoff_at=cutoff)); old={(e.position,e.player_id):e.rank for e in previous.entries.all()} if previous else {}
     coverage=snapshot_coverage(season,cutoff,allow_unavailable)
+    if weekly_replay is not None: coverage["weekly_replay"]=weekly_replay
     if formula.config.get("position_source") in PROFILE_SOURCES:
         unknown=list(PlayerSeasonScore.objects.filter(season=season,formula=formula,as_of=cutoff,position=Position.UNKNOWN).values_list("minutes",flat=True))
         coverage["position_profiles"]={"source":"api_football.players/profiles.position","unavailable_players":len(unknown),

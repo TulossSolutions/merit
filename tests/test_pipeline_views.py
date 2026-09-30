@@ -68,7 +68,10 @@ def test_public_pages_and_htmx(pipeline):
 def test_home_shows_ranking_movement_next_to_score(pipeline):
     snapshot,_=pipeline
     entry=snapshot.entries.filter(position=Position.FWD).first()
-    snapshot.entries.filter(pk=entry.pk).update(previous_rank=entry.rank+2,movement=2)
+    previous=RankingSnapshot.objects.create(season=snapshot.season,formula=snapshot.formula,published_at=snapshot.cutoff_at-timedelta(days=7),
+        cutoff_at=snapshot.cutoff_at-timedelta(days=7),is_public=True)
+    RankingEntry.objects.create(snapshot=previous,player=entry.player,team=entry.team,position=entry.position,rank=entry.rank+2,
+        score=entry.score,minutes=entry.minutes)
     cache.clear()
     content=Client().get("/").content
     assert b'images/merit_logo_full.png' in content

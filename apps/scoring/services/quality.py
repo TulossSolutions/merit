@@ -24,9 +24,12 @@ def check_quality(season,as_of=None,*,allow_unavailable=False):
     add("ERROR","player_assigned_outside_fixture_teams",PlayerFixture.objects.filter(fixture__in=scoring_fixtures).exclude(Q(team=F("fixture__home_team"))|Q(team=F("fixture__away_team"))).count())
     add("ERROR","negative_count_statistics",PlayerFixtureMetric.objects.filter(player_fixture__fixture__in=scoring_fixtures,value__lt=0).count())
     add("ERROR","numerator_greater_than_denominator",PlayerFixtureMetric.objects.filter(player_fixture__fixture__in=scoring_fixtures,numerator__gt=F("denominator")).count())
-    for score in PlayerSeasonScore.objects.filter(season=season):
+    scores=PlayerSeasonScore.objects.filter(season=season)
+    if as_of is not None: scores=scores.filter(as_of=as_of)
+    for score in scores:
         total=sum((Decimal(str(v["effective_weight"])) for v in score.metric_breakdown.values() if v.get("active")),Decimal("0"))
-        if score.metric_breakdown and abs(total-1)>Decimal("0.00001"): issues.append(("ERROR","effective_weights_not_one",score.pk))
+        unscored=not score.eligible and score.performance_score is None and score.final_score is None and total==0
+        if not unscored and abs(total-1)>Decimal("0.00001"): issues.append(("ERROR","effective_weights_not_one",score.pk))
         disabled=sum(1 for value in score.coverage_breakdown.values() if not value.get("active"))
         if disabled: issues.append(("WARNING","metrics_below_coverage_threshold",disabled))
     return issues

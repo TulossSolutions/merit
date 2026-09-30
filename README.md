@@ -84,6 +84,12 @@ See [campaign contribution and archive operations](docs/campaign_contribution.md
 calendar, title values, participation rules and coverage limitations. `deployment/ranked-backfill.service`
 and its timer replace the single-season job and run daily at 03:00 UTC.
 
+The [weekly archive replay](docs/weekly_replay.md) reconstructs Monday 06:00 UTC
+rankings for 2015/16–2026/27 from retained data once fixture retrieval is complete.
+It resumes in bounded batches, uses no API calls, preserves public snapshots and
+keeps trophy-blocked weeks pending. Real earlier weekly ranks supply movement on
+the homepage, position lists and player pages; missing baselines are not new entries.
+
 ## StatsBomb Open Data backtesting
 
 StatsBomb Open Data is imported only into an isolated backtesting store; it never publishes rankings or mixes with API-Football operational rows. Download the official Open Data repository separately, preserve StatsBomb attribution in any published research, and run:

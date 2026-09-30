@@ -1,0 +1,11 @@
+[Unit]
+Description=Resume Merit weekly archive replay outside the daily import window
+
+[Timer]
+OnCalendar=*-*-* 00,01,11..23:00:00 UTC
+# Do not catch up a missed tick inside the archive import window after a reboot.
+Persistent=false
+Unit=ranked-weekly-replay.service
+
+[Install]
+WantedBy=timers.target
