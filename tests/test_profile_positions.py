@@ -86,11 +86,11 @@ def test_profile_endpoint_uses_page_parameter_and_retains_full_response():
     assert provider.requests_made==1
 
 
-@pytest.mark.parametrize("damage",["wrong_page","empty","count","identity","duplicates","position","size"])
+@pytest.mark.parametrize("damage",["wrong_page","not_list","count","identity","duplicates","position","size"])
 def test_malformed_profile_pages_are_not_accepted(damage):
     payload=profile_page(1)
     if damage=="wrong_page": payload["paging"]["current"]=2
-    if damage=="empty": payload["response"]=[]; payload["results"]=0
+    if damage=="not_list": payload["response"]={}; payload["results"]=0
     if damage=="count": payload["results"]=9
     if damage=="identity": payload["response"][0]["player"]["id"]=None
     if damage=="duplicates": payload["response"][1]["player"]["id"]=762
@@ -310,3 +310,23 @@ def test_known_profile_category_without_raw_evidence_is_not_accepted():
     PlayerPositionProfile.objects.update(source_payload=None)
     with pytest.raises(ValidationError,match="payload evidence"):
         recompute_scores(season,formula("1.4"),cutoff)
+
+
+def test_empty_tail_pages_are_retained_until_the_reported_end_not_treated_as_errors():
+    provider=provider_for({1:profile_page(1,3),2:profile_page(2,3,()),3:profile_page(3,3,())})
+    period(provider)
+    catalogue=ProfileCatalogue(provider,report=Mock())
+    assert catalogue.sync()["applied"]==2
+    assert [call.args[1]["page"] for call in provider._request.call_args_list]==[1,2,3]
+    assert RawProviderPayload.objects.filter(resource_type="player_profile_page").count()==3
+    assert catalogue.state.metadata["status"]=="complete" and catalogue.state.metadata["profiles"]==2
+    assert all(profile.position==Position.FWD for profile in PlayerPositionProfile.objects.all())
+
+
+def test_entirely_empty_catalogue_cannot_mark_all_players_absent():
+    provider=provider_for({1:profile_page(1,players=())})
+    period(provider)
+    catalogue=ProfileCatalogue(provider,report=Mock())
+    with pytest.raises(ValueError,match="cannot establish player absence"):
+        catalogue.sync()
+    assert catalogue.state.metadata["status"]=="failed" and PlayerPositionProfile.objects.count()==0

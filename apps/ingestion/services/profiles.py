@@ -60,6 +60,7 @@ class ProfileCatalogue:
                 self.remember(raw)
                 if page==1 or page%50==0 or page==meta["total_pages"]:
                     self.report(f"Player profiles: cached page {page}/{meta['total_pages']}",flush=True)
+            if not self.index: raise ValueError("Empty player-profile catalogue cannot establish player absence")
             meta.update(status="complete",profiles=len(self.index))
             self.state.metadata=meta
             self.state.last_success_at=timezone.now()

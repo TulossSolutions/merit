@@ -130,7 +130,7 @@ class ApiFootballProvider:
         payload=self._request("players/profiles",{"page":page})
         paging=payload.get("paging") or {}
         rows=payload.get("response")
-        if not isinstance(rows,list) or not rows or paging.get("current")!=page or not isinstance(paging.get("total"),int) or paging["total"]<page:
+        if not isinstance(rows,list) or paging.get("current")!=page or not isinstance(paging.get("total"),int) or paging["total"]<page:
             raise ValueError("Invalid player-profile pagination response")
         if len(rows)>250 or payload.get("results")!=len(rows):
             raise ValueError("Invalid player-profile page size")

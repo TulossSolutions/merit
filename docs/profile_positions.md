@@ -13,6 +13,10 @@ and not `/fixtures/players` tactical positions. The live endpoint was checked on
 30 September 2026: up to 250 profiles per page, 2,739 pages at that time. The page
 count is read from each response, not hard-coded. The documentation renderer was
 inaccessible during verification; response shape and paging were checked live.
+The live catalog also returned valid empty tail pages after a partial page. Empty
+pages with consistent paging and `results: 0` are retained, and scanning continues
+through the reported total. An entirely empty catalog is rejected and cannot be
+used to mark all tracked players absent.
 
 - [Official profile endpoint documentation](https://www.api-football.com/documentation-v3#tag/Players/operation/get-players-profiles)
 - [Official quota optimization guide](https://www.api-football.com/news/post/how-to-optimize-api-sports-calls-and-quota-usage)
