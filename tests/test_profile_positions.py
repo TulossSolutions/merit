@@ -1,22 +1,28 @@
 from datetime import date, datetime, timedelta, timezone
+from dataclasses import replace
+from pathlib import Path
 import hashlib
 import json
 from unittest.mock import Mock, patch
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.core.management import call_command, CommandError
 from django.test import Client, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.db import connection
 from django.utils import timezone as django_timezone
 
 from apps.football.models import Competition, CompetitionSeason, Player, PlayerFixture, Position, Season
-from apps.ingestion.models import PlayerPositionProfile, RawProviderPayload
+from apps.ingestion.models import PlayerPositionProfile, RawProviderPayload, ReviewedPlayerPosition, PlayerIdentityAlias
 from apps.ingestion.providers.api_football import ApiFootballProvider
 from apps.ingestion.providers.base import ProviderRequestLimitReached
 from apps.ingestion.services.archive import ArchiveBackfill
 from apps.ingestion.services.profiles import ProfileCatalogue
 from apps.ingestion.services.sync import ingest_fixture_bundle, sync_reference
+from apps.ingestion.services.reviews import import_corrections, read_corrections, link_identity
+from apps.ingestion.services.positions import award_positions
+from apps.rankings.models import RankingSnapshot
 from apps.rankings.services.publish import publish
 from apps.scoring.models import PlayerSeasonScore, ScoringFormula
 from apps.scoring.services.calculate import recompute_scores, _aggregate
@@ -275,10 +281,10 @@ def test_v1_4_changes_only_category_policy_not_weights_or_trophy_rules():
     assert old==new
 
 
-def test_archive_uses_v1_4_and_requires_complete_profile_catalogue():
+def test_archive_uses_v1_5_and_requires_complete_profile_catalogue():
     provider=provider_for({1:profile_page(1)})
     job=ArchiveBackfill(provider,report=Mock())
-    assert job.formula().config["position_source"]=="api_football_profile"
+    assert job.formula().config["position_source"]=="api_football_profile_with_reviewed_fallback"
     with pytest.raises(ValueError,match="incomplete"):
         ProfileCatalogue(provider,report=Mock()).apply_profiles()
     response=Client().get("/methodology/")
@@ -297,10 +303,10 @@ def test_archive_scans_profiles_before_ingestion_then_publishes_new_players_from
     job.ingest_period=ingest
     result=job.run()
     assert result["periods"]["2026-27"]["publication"]=="published"
-    assert result["periods"]["2026-27"]["formula"]=="1.4"
+    assert result["periods"]["2026-27"]["formula"]=="1.5"
     assert result["status"]=="caught_up" and provider._request.call_count==1
     assert PlayerPositionProfile.objects.count()==2
-    assert ScoringFormula.objects.get(is_active=True).version=="1.4"
+    assert ScoringFormula.objects.get(is_active=True).version=="1.5"
 
 
 def test_known_profile_category_without_raw_evidence_is_not_accepted():
@@ -330,3 +336,217 @@ def test_entirely_empty_catalogue_cannot_mark_all_players_absent():
     with pytest.raises(ValueError,match="cannot establish player absence"):
         catalogue.sync()
     assert catalogue.state.metadata["status"]=="failed" and PlayerPositionProfile.objects.count()==0
+
+
+def review_file(tmp_path, rows=((20589,"Attacker"),)):
+    path=tmp_path/"review.md"
+    path.write_text("\n".join(f"| {pid} | Player | Team | 180 | unavailable | {position} |" for pid,position in rows),encoding="utf8")
+    return path
+
+
+def reviewed_period():
+    provider=provider_for({1:profile_page(1,players=((762,"Attacker"),(20589,None)))})
+    season,cutoff=period(provider)
+    ProfileCatalogue(provider,report=Mock()).sync()
+    rebuild_elo(season)
+    return provider,season,cutoff
+
+
+def test_owner_correction_table_has_consistent_categories_and_excludes_id_zero():
+    corrections,digest=read_corrections(Path("docs/unknown_profile_positions.md"))
+    assert len(corrections)==68 and "0" not in corrections and corrections["90588"]==Position.FWD
+    assert len(digest)==64 and set(corrections.values())=={Position.GK,Position.DEF,Position.MID,Position.FWD}
+
+
+@pytest.mark.parametrize("rows",[
+    ((20589,"Attacker"),(20589,"Defender")),((20589,"Striker"),),
+])
+def test_invalid_or_conflicting_correction_categories_are_rejected(tmp_path,rows):
+    with pytest.raises(ValidationError): read_corrections(review_file(tmp_path,rows))
+
+
+def test_incomplete_correction_row_is_rejected(tmp_path):
+    path=tmp_path/"bad.md"; path.write_text("| 20589 | Player |",encoding="utf8")
+    with pytest.raises(ValidationError,match="Incomplete"): read_corrections(path)
+
+
+def test_manual_fallback_rejoins_category_without_altering_api_evidence_or_old_snapshots(tmp_path):
+    provider,season,cutoff=reviewed_period()
+    old_formula=formula("1.4"); recompute_scores(season,old_formula,cutoff)
+    old=publish(season,old_formula,cutoff); frozen=list(old.entries.values()); coverage=dict(old.coverage_summary)
+    before=PlayerPositionProfile.objects.get(player__provider_id="20589")
+    result=import_corrections(review_file(tmp_path))
+    assert result["created_reviews"]==1
+    scoring_formula=formula("1.5"); scores=recompute_scores(season,scoring_formula,cutoff)
+    restored=next(item for item in scores if item.player.provider_id=="20589")
+    assert restored.eligible and restored.position==Position.FWD and restored.minutes==180
+    evidence=restored.context_summary["award_position"]
+    assert evidence["source"]=="manual_reviewed_position" and evidence["source_sha256"]==result["source_sha256"]
+    assert evidence["profile_payload_sha256"]==before.source_payload.payload_sha256
+    new=publish(season,scoring_formula,cutoff)
+    assert new.entries.count()==2 and new.coverage_summary["position_profiles"]["unavailable_players"]==0
+    assert new.coverage_summary["position_profiles"]["reviewed_players"]==1
+    before.refresh_from_db(); assert before.position==Position.UNKNOWN and before.provider_position==""
+    old.refresh_from_db(); assert old.coverage_summary==coverage and list(old.entries.values())==frozen
+    new_frozen=list(new.entries.values())
+    import_corrections(review_file(tmp_path,((20589,"Midfielder"),)))
+    assert list(new.entries.values())==new_frozen
+    assert set(PlayerFixture.objects.values_list("position",flat=True))=={Position.MID,Position.FWD}
+    provider._request.reset_mock()
+    assert Client().get(f"/players/bryan-mbeumo/?season={season.slug}").status_code==200
+    provider._request.assert_not_called()
+
+
+def test_known_api_position_always_wins_and_reviews_are_idempotent_immutable(tmp_path):
+    provider=provider_for({1:profile_page(1)})
+    period(provider); ProfileCatalogue(provider,report=Mock()).sync()
+    path=review_file(tmp_path,((762,"Midfielder"),))
+    assert import_corrections(path)["created_reviews"]==1
+    assert import_corrections(path)["created_reviews"]==0
+    player=Player.objects.get(provider_id="762")
+    assert player.primary_position==Position.FWD
+    assert award_positions([player.pk],reviewed=True)[player.pk]["source"]=="api_football.players/profiles.position"
+    review=ReviewedPlayerPosition.objects.get(player=player)
+    review.position=Position.DEF
+    with pytest.raises(ValidationError,match="immutable"): review.save()
+
+
+def test_catalogue_refresh_retains_review_and_new_known_profile_takes_priority(tmp_path):
+    provider,_,_=reviewed_period(); import_corrections(review_file(tmp_path))
+    later=django_timezone.now()+timedelta(days=8)
+    with patch("apps.ingestion.services.profiles.timezone.now",return_value=later):
+        ProfileCatalogue(provider,now=later,report=Mock()).sync()
+    player=Player.objects.get(provider_id="20589")
+    assert player.primary_position==Position.FWD and player.position_profile.position==Position.UNKNOWN
+    provider._request.side_effect=lambda path,params:profile_page(1,players=((762,"Attacker"),(20589,"Midfielder")))
+    latest=later+timedelta(days=8)
+    with patch("apps.ingestion.services.profiles.timezone.now",return_value=latest):
+        ProfileCatalogue(provider,now=latest,report=Mock()).sync()
+    player.refresh_from_db()
+    assert player.primary_position==Position.MID and ReviewedPlayerPosition.objects.filter(player=player).count()==1
+    assert award_positions([player.pk],reviewed=True)[player.pk]["position"]==Position.MID
+
+
+def test_reference_sync_preserves_manual_category(tmp_path):
+    provider,season,_=reviewed_period(); import_corrections(review_file(tmp_path))
+    bundle=provider.normalize_fixture(RawProviderPayload.objects.filter(resource_type="fixture").first().payload)
+    provider.list_teams=Mock(return_value=[bundle.fixture.away_team])
+    provider.list_players=Mock(return_value=[replace(bundle.participations[1].player,position="M")])
+    sync_reference(provider,season)
+    assert Player.objects.get(provider_id="20589").primary_position==Position.FWD
+
+
+def test_identity_zero_stays_excluded_even_with_a_known_profile_and_manual_row(tmp_path):
+    provider,season,cutoff=reviewed_period()
+    player=Player.objects.get(provider_id="20589"); player.provider_id="0"; player.save()
+    profile=player.position_profile; profile.position=Position.FWD; profile.reason=""; profile.save()
+    path=review_file(tmp_path,((0,"Attacker"),(762,"Attacker")))
+    import_corrections(path)
+    score=next(item for item in recompute_scores(season,formula("1.5"),cutoff) if item.player_id==player.pk)
+    assert score.position==Position.UNKNOWN and not score.eligible and score.final_score is None
+    assert score.context_summary["award_position"]["reason"]=="invalid_provider_player_id"
+    assert not ReviewedPlayerPosition.objects.filter(player=player).exists()
+
+
+def alias_fixture(provider,season):
+    raw=RawProviderPayload.objects.filter(resource_type="fixture").first()
+    bundle=provider.normalize_fixture(raw.payload)
+    old_row=replace(bundle.participations[1],player=replace(bundle.participations[1].player,id="90588"),minutes=15)
+    historical=replace(bundle,fixture=replace(bundle.fixture,id="old-mbeumo"),
+        participations=(bundle.participations[0],old_row),raw_payload={"original_player_id":90588})
+    fixture=ingest_fixture_bundle(historical,season.competitionseason_set.get(competition__provider_id="39"),"api_football")
+    return historical,fixture
+
+
+def test_mbeumo_alias_moves_rows_preserves_evidence_and_replays_canonically(tmp_path):
+    provider,season,_=reviewed_period(); bundle,fixture=alias_fixture(provider,season)
+    old=Player.objects.get(provider_id="90588"); canonical=Player.objects.get(provider_id="20589")
+    row=PlayerFixture.objects.get(player=old); row_id=row.pk; metrics=list(row.metrics.values())
+    payload=RawProviderPayload.objects.get(provider_resource_id="old-mbeumo"); digest=payload.payload_sha256
+    path=review_file(tmp_path,((90588,"Attacker"),))
+    result=import_corrections(path,aliases=[("90588","20589")])
+    assert result["moved_appearances"]==1 and ReviewedPlayerPosition.objects.get().player_id==canonical.pk
+    row.refresh_from_db(); old.refresh_from_db(); payload.refresh_from_db()
+    assert row.player_id==canonical.pk and row.pk==row_id and row.minutes==15 and list(row.metrics.values())==metrics
+    assert not old.active and payload.payload_sha256==digest and payload.payload=={"original_player_id":90588}
+    assert import_corrections(path,aliases=[("90588","20589")])["moved_appearances"]==0
+    ingest_fixture_bundle(bundle,fixture.competition_season,"api_football",retain_raw=False)
+    assert PlayerFixture.objects.get(fixture=fixture,player=canonical).pk==row_id
+    assert not PlayerFixture.objects.filter(player=old).exists() and Player.objects.count()==3
+    response=Client().get(f"/players/{old.slug}/?season=2017-18")
+    assert response.status_code==301 and response["Location"]==f"/players/{canonical.slug}/?season=2017-18"
+    search=Client().get("/players/search/?q=Bryan")
+    assert search.status_code==200 and old.slug.encode() not in search.content and canonical.slug.encode() in search.content
+    provider.list_teams=Mock(return_value=[bundle.fixture.away_team]); provider.list_players=Mock(return_value=[bundle.participations[1].player])
+    sync_reference(provider,season)
+    old.refresh_from_db(); assert not old.active and Player.objects.count()==3
+
+
+def test_duplicate_canonical_fixture_input_is_rejected_without_writes(tmp_path):
+    provider,season,_=reviewed_period(); bundle,fixture=alias_fixture(provider,season)
+    import_corrections(review_file(tmp_path,((90588,"Attacker"),)),aliases=[("90588","20589")])
+    duplicate=replace(bundle,participations=(*bundle.participations,replace(bundle.participations[1],
+        player=replace(bundle.participations[1].player,id="20589"))))
+    before=RawProviderPayload.objects.count(); rows=list(PlayerFixture.objects.filter(fixture=fixture).values())
+    with pytest.raises(ValidationError,match="Duplicate canonical"):
+        ingest_fixture_bundle(duplicate,fixture.competition_season,"api_football")
+    assert RawProviderPayload.objects.count()==before and list(PlayerFixture.objects.filter(fixture=fixture).values())==rows
+
+
+def test_overlapping_alias_fixtures_are_not_silently_merged(tmp_path):
+    provider,season,_=reviewed_period()
+    old=Player.objects.create(provider="api_football",provider_id="90588",name="Bryan Mbeumo")
+    row=PlayerFixture.objects.filter(player__provider_id="20589").first()
+    PlayerFixture.objects.create(player=old,fixture=row.fixture,team=row.team,opponent=row.opponent,position=Position.FWD,minutes=15)
+    with pytest.raises(ValidationError,match="Overlapping"):
+        import_corrections(review_file(tmp_path,((90588,"Attacker"),)),aliases=[("90588","20589")])
+    assert not PlayerIdentityAlias.objects.exists() and not ReviewedPlayerPosition.objects.exists()
+    assert PlayerFixture.objects.filter(player=old).count()==1
+
+
+@pytest.mark.parametrize("old,canonical",[("0","20589"),("20589","20589")])
+def test_invalid_identity_alias_is_rejected(old,canonical):
+    with pytest.raises(ValidationError,match="Invalid"):
+        link_identity(old,canonical,"docs/review.md","a"*64,"project owner")
+
+
+def test_missing_player_blocks_import_without_partial_reviews(tmp_path):
+    reviewed_period()
+    with pytest.raises(ValidationError,match="not found"):
+        import_corrections(review_file(tmp_path,((20589,"Attacker"),(999999,"Defender"))))
+    assert not ReviewedPlayerPosition.objects.exists()
+
+
+def test_v1_5_changes_only_position_fallback_policy():
+    old=formula("1.4").config; new=formula("1.5").config
+    assert new["position_source"]=="api_football_profile_with_reviewed_fallback"
+    for config in (old,new):
+        for key in ("version","name","notes","position_source"): config.pop(key,None)
+    assert old==new
+
+
+def test_publication_command_adds_corrected_snapshot_without_api_calls_or_rewriting_history(tmp_path):
+    provider,season,cutoff=reviewed_period()
+    old_formula=formula("1.4"); recompute_scores(season,old_formula,cutoff)
+    old=publish(season,old_formula,cutoff); frozen=list(old.entries.values())
+    call_command("import_reviewed_positions",str(review_file(tmp_path)))
+    new_formula=formula("1.5")
+    with patch.object(ApiFootballProvider,"_request",side_effect=AssertionError("No API calls permitted")):
+        call_command("publish_reviewed_rankings")
+        call_command("publish_reviewed_rankings")
+    assert RankingSnapshot.objects.count()==2
+    new=RankingSnapshot.objects.get(formula=new_formula)
+    assert new.cutoff_at==old.cutoff_at and new.is_public and new.entries.count()==2
+    assert list(old.entries.values())==frozen
+    response=Client().get(f"/rankings/attackers/?season={season.slug}")
+    assert response.status_code==200 and b"Bryan Mbeumo" in response.content
+
+
+def test_publication_quality_failure_keeps_old_publication_and_rolls_back_new_scores(tmp_path):
+    provider,season,cutoff=reviewed_period()
+    old_formula=formula("1.4"); recompute_scores(season,old_formula,cutoff); old=publish(season,old_formula,cutoff)
+    import_corrections(review_file(tmp_path)); new_formula=formula("1.5")
+    with patch("apps.rankings.services.publish.check_quality",return_value=[("ERROR","test_missing_evidence",1)]):
+        with pytest.raises(CommandError,match="blocked"):
+            call_command("publish_reviewed_rankings")
+    assert RankingSnapshot.objects.get().pk==old.pk and not PlayerSeasonScore.objects.filter(formula=new_formula).exists()

@@ -12,7 +12,7 @@ def canonical_bytes(config): return json.dumps(config,sort_keys=True,separators=
 def validate_formula(config):
     from .achievements import validate_achievement_config
     validate_achievement_config(config.get("achievements"))
-    if config.get("position_source","match") not in ("match","api_football_profile"):
+    if config.get("position_source","match") not in ("match","api_football_profile","api_football_profile_with_reviewed_fallback"):
         raise ValueError("Unsupported award position source")
     if not SEMVER.match(config.get("version","")): raise ValueError("Formula version must use major.minor format")
     if set(config.get("positions",{})) != {"GK","DEF","MID","FWD"}: raise ValueError("Formula requires exactly GK, DEF, MID and FWD")

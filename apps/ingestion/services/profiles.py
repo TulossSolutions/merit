@@ -11,6 +11,7 @@ from apps.football.models import Player, Position
 from apps.ingestion.models import PlayerPositionProfile, ProviderSyncState, RawProviderPayload
 from apps.ingestion.providers.base import ProviderRequestLimitReached
 from apps.ingestion.providers.positions import normalize_position
+from .positions import latest_reviews
 
 
 class ProfileCatalogue:
@@ -81,13 +82,14 @@ class ProfileCatalogue:
         players=list(Player.objects.filter(provider=self.provider.provider_name,playerfixture__isnull=False)
             .filter(Q(position_profile__isnull=True)|Q(position_profile__checked_at__lt=generation)).distinct())
         profiles=[]
+        reviews=latest_reviews([player.pk for player in players])
         for player in players:
             raw_position,payload_id,checked_at=self.index.get(player.provider_id,("",None,self.state.last_success_at))
             position=normalize_position(raw_position)
             reason="" if position!=Position.UNKNOWN else "profile_not_found" if payload_id is None else "profile_position_unavailable"
             profiles.append(PlayerPositionProfile(player=player,position=position,provider_position=raw_position,
                 source_payload_id=payload_id,checked_at=checked_at,reason=reason))
-            player.primary_position=position
+            player.primary_position=reviews[player.pk].position if position==Position.UNKNOWN and player.pk in reviews else position
         if profiles:
             PlayerPositionProfile.objects.bulk_create(profiles,batch_size=500,update_conflicts=True,unique_fields=["player"],
                 update_fields=["position","provider_position","source_payload","checked_at","reason"])

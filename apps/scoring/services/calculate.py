@@ -1,9 +1,8 @@
 from collections import defaultdict
 from decimal import Decimal
 import logging
-from django.core.exceptions import ValidationError
 from django.db import transaction
-from apps.ingestion.models import PlayerPositionProfile
+from apps.ingestion.services.positions import PROFILE_SOURCES, award_positions
 from apps.football.models import Competition, PlayerFixture, Position
 from apps.scoring.models import PlayerSeasonScore
 from .achievements import prepare_season_achievements,season_achievement
@@ -45,30 +44,23 @@ def recompute_scores(season,formula,as_of):
     prepared_achievements=prepare_season_achievements(season,as_of,formula.config.get("achievements"))
     rows=PlayerFixture.objects.filter(fixture__in=fixtures_for_award_period(season),fixture__competition_season__competition__is_tracked=True,fixture__status="FINISHED",fixture__starts_at__lte=as_of,fixture__stats_ingested_at__isnull=False).select_related("fixture","fixture__competition_season__competition","player").prefetch_related("metrics").order_by("fixture__starts_at","fixture_id","player_id")
     rows=list(rows)
-    profile_based=formula.config.get("position_source")=="api_football_profile"
+    profile_based=formula.config.get("position_source") in PROFILE_SOURCES
     profiles={}
     if profile_based:
-        profiles={item.player_id:item for item in PlayerPositionProfile.objects.filter(player_id__in={row.player_id for row in rows})
-            .select_related("source_payload").only("player_id","position","provider_position","checked_at","reason",
-                "source_payload_id","source_payload__payload_sha256")}
-        missing={row.player_id for row in rows}-profiles.keys()
-        if missing: raise ValidationError(f"Verified player profile lookup required for {len(missing)} players")
-        if any(item.position!=Position.UNKNOWN and (not item.source_payload_id or item.reason) for item in profiles.values()):
-            raise ValidationError("Known award positions require verified profile payload evidence")
+        profiles=award_positions({row.player_id for row in rows},
+            reviewed=formula.config["position_source"]=="api_football_profile_with_reviewed_fallback")
     grouped=defaultdict(list)
     for row in rows:
-        position=profiles[row.player_id].position if profile_based else row.position
+        position=profiles[row.player_id]["position"] if profile_based else row.position
         grouped[(position,row.player_id)].append(row)
     configs=formula.config; output=[]
     if profile_based:
         for (position,pid),items in grouped.items():
             if position!=Position.UNKNOWN: continue
-            profile=profiles[pid]
             score,_=PlayerSeasonScore.objects.update_or_create(season=season,player_id=pid,formula=formula,as_of=as_of,defaults={
                 "position":Position.UNKNOWN,"eligible":False,"minutes":sum(row.minutes for row in items),"appearances":len(items),
                 "performance_score":None,"availability_score":None,"final_score":None,"achievement_score":None,"achievement_breakdown":{},
-                "metric_breakdown":{},"coverage_breakdown":{},"context_summary":{"award_position":{"source":"api_football.players/profiles.position",
-                    "position":Position.UNKNOWN,"reason":profile.reason,"checked_at":profile.checked_at.isoformat()}}})
+                "metric_breakdown":{},"coverage_breakdown":{},"context_summary":{"award_position":profiles[pid]}})
             output.append(score)
     for position in (Position.GK,Position.DEF,Position.MID,Position.FWD):
         player_rows={pid:items for (pos,pid),items in grouped.items() if pos==position}; aggregate={pid:{} for pid in player_rows}
@@ -101,10 +93,6 @@ def recompute_scores(season,formula,as_of):
             if configs.get("achievements"):
                 summary["achievements"]={**achievement_breakdown,"score":str(achievement) if achievement is not None else None}
             if profile_based:
-                profile=profiles[pid]
-                summary["award_position"]={"source":"api_football.players/profiles.position","position":position,
-                    "provider_position":profile.provider_position,"checked_at":profile.checked_at.isoformat(),
-                    "payload_sha256":profile.source_payload.payload_sha256 if profile.source_payload else None,
-                    "policy":"current_profile_all_imported_seasons"}
+                summary["award_position"]=profiles[pid]
             score,_=PlayerSeasonScore.objects.update_or_create(season=season,player_id=pid,formula=formula,as_of=as_of,defaults={"position":position,"eligible":eligible,"minutes":minutes,"appearances":len(items),"performance_score":performance if total_weight else None,"availability_score":availability,"achievement_score":achievement,"achievement_breakdown":achievement_breakdown,"final_score":final,"metric_breakdown":breakdown,"coverage_breakdown":coverage,"context_summary":summary}); output.append(score)
     logger.info("score_calculation_complete season=%s formula=%s players=%s",season.slug,formula.version,len(output)); return output

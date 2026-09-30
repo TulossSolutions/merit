@@ -1,6 +1,6 @@
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import Http404, HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect, HttpResponsePermanentRedirect
 from django.shortcuts import get_object_or_404,render
 from django.urls import reverse
 from django.views.decorators.cache import cache_page
@@ -9,6 +9,7 @@ from apps.football.models import Player, Position, Season
 from apps.rankings.models import RankingEntry
 from apps.rankings.services.queries import entries,latest_snapshot
 from apps.scoring.models import PlayerSeasonScore
+from apps.ingestion.models import PlayerIdentityAlias
 
 SLUGS={"attackers":Position.FWD,"midfielders":Position.MID,"defenders":Position.DEF,"goalkeepers":Position.GK}
 HEADLINES={Position.FWD:["goals_per90","assists_per90","shots_on_target_per90"],Position.MID:["key_passes_per90","interceptions_per90","pass_accuracy"],Position.DEF:["duel_win_rate","interceptions_per90","tackles_per90"],Position.GK:["save_percentage","saves_per90","clean_sheet_rate"]}
@@ -30,6 +31,11 @@ def ranking(request,position_slug):
     return render(request,template,context)
 def player_detail(request,slug):
     player=get_object_or_404(Player,slug=slug)
+    alias=PlayerIdentityAlias.objects.filter(alias_player=player).select_related("canonical_player").first()
+    if alias:
+        target=reverse("player_detail",args=[alias.canonical_player.slug])
+        if request.GET: target+="?"+request.GET.urlencode()
+        return HttpResponsePermanentRedirect(target)
     public_entries=list(RankingEntry.objects.filter(player=player,snapshot__is_public=True,snapshot__season__is_published=True)
         .select_related("snapshot__season","snapshot__formula","team")
         .order_by("-snapshot__season__starts_on","-snapshot__cutoff_at","-snapshot__published_at","-snapshot_id"))
@@ -79,6 +85,6 @@ def compare(request):
 def player_search(request):
     q=request.GET.get("q","").strip(); qs=Player.objects.none()
     if len(q)>=2:
-        qs=Player.objects.filter(Q(name__icontains=q)|Q(common_name__icontains=q)); position=request.GET.get("position")
+        qs=Player.objects.filter(Q(name__icontains=q)|Q(common_name__icontains=q),canonical_identity__isnull=True); position=request.GET.get("position")
         if position in Position.values: qs=qs.filter(primary_position=position)
     return render(request,"players/partials/search_results.html",{"players":qs.order_by("name")[:10]})

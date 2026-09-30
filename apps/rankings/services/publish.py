@@ -3,6 +3,7 @@ from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 from apps.football.models import PlayerFixture, Position
+from apps.ingestion.services.positions import PROFILE_SOURCES
 from apps.rankings.models import RankingEntry, RankingSnapshot
 from apps.scoring.models import PlayerSeasonScore
 from apps.scoring.services.formulas import validate_formula
@@ -23,10 +24,14 @@ def publish(season,formula,cutoff,force=False,*,allow_unavailable=False):
     if not scores: raise ValueError("No eligible scores exist for the exact cutoff")
     previous=RankingSnapshot.objects.filter(season=season,is_public=True,cutoff_at__lt=cutoff).order_by("-cutoff_at").first(); old={(e.position,e.player_id):e.rank for e in previous.entries.all()} if previous else {}
     coverage=snapshot_coverage(season,cutoff,allow_unavailable)
-    if formula.config.get("position_source")=="api_football_profile":
+    if formula.config.get("position_source") in PROFILE_SOURCES:
         unknown=list(PlayerSeasonScore.objects.filter(season=season,formula=formula,as_of=cutoff,position=Position.UNKNOWN).values_list("minutes",flat=True))
         coverage["position_profiles"]={"source":"api_football.players/profiles.position","unavailable_players":len(unknown),
             "unavailable_minutes":sum(unknown),"policy":"current_profile_all_imported_seasons"}
+        if formula.config["position_source"]=="api_football_profile_with_reviewed_fallback":
+            coverage["position_profiles"]["policy"]="profile_first_reviewed_fallback_all_imported_seasons"
+            coverage["position_profiles"]["reviewed_players"]=PlayerSeasonScore.objects.filter(
+                season=season,formula=formula,as_of=cutoff,context_summary__award_position__source="manual_reviewed_position").count()
     snapshot=RankingSnapshot.objects.create(season=season,formula=formula,published_at=timezone.now(),cutoff_at=cutoff,is_public=False,
         coverage_summary=coverage)
     by_position={p:[] for p in (Position.GK,Position.DEF,Position.MID,Position.FWD)}

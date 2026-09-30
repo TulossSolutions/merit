@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 from django.db import transaction
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.text import slugify
 from apps.football.models import CompetitionSeason, Fixture, Player, PlayerFixture, PlayerFixtureMetric, PlayerTeamSeason, Team, TeamCompetitionSeason
@@ -9,11 +10,18 @@ from apps.ingestion.models import PlayerPositionProfile,RawProviderPayload
 from apps.ingestion.providers.base import ProviderRequestLimitReached
 from apps.ingestion.providers.positions import normalize_position
 from apps.football.award_periods import award_year,ensure_award_period
+from .positions import latest_reviews
+from .reviews import resolve_provider_aliases
 
 logger=logging.getLogger(__name__)
 
 @transaction.atomic
 def ingest_fixture_bundle(bundle, competition_season, provider="mock", request_path="", retain_raw=True):
+    aliases=resolve_provider_aliases(provider,[row.player.id for row in bundle.participations])
+    identities=[aliases[str(row.player.id)].provider_id if str(row.player.id) in aliases else str(row.player.id)
+        for row in bundle.participations]
+    if len(identities)!=len(set(identities)):
+        raise ValidationError("Duplicate canonical player in fixture bundle; identity evidence review required")
     if retain_raw:
         raw=json.dumps(bundle.raw_payload,sort_keys=True,separators=(",",":"),default=str).encode()
         RawProviderPayload.objects.create(provider=provider,resource_type="fixture",provider_resource_id=bundle.fixture.id,request_path=request_path,payload=bundle.raw_payload,payload_sha256=hashlib.sha256(raw).hexdigest(),http_status=200)
@@ -28,7 +36,10 @@ def ingest_fixture_bundle(bundle, competition_season, provider="mock", request_p
         fixture.available_minutes=bundle.fixture.available_minutes
         fixture.save(update_fields=["available_minutes","updated_at"])
     for row in bundle.participations:
-        player,created=Player.objects.get_or_create(provider=provider,provider_id=row.player.id,defaults={"name":row.player.name,"slug":"","first_name":row.player.first_name,"last_name":row.player.last_name,"common_name":row.player.common_name,"birth_date":row.player.birth_date,"image_url":row.player.image_url,"height_cm":row.player.height_cm,"primary_position":normalize_position(row.position,row.player.detailed_position),"detailed_position":row.player.detailed_position})
+        player=aliases.get(str(row.player.id))
+        created=False
+        if player is None:
+            player,created=Player.objects.get_or_create(provider=provider,provider_id=row.player.id,defaults={"name":row.player.name,"slug":"","first_name":row.player.first_name,"last_name":row.player.last_name,"common_name":row.player.common_name,"birth_date":row.player.birth_date,"image_url":row.player.image_url,"height_cm":row.player.height_cm,"primary_position":normalize_position(row.position,row.player.detailed_position),"detailed_position":row.player.detailed_position})
         if not created and player.primary_position=="UNKNOWN" and not PlayerPositionProfile.objects.filter(player=player).exists(): player.primary_position=normalize_position(row.position,row.player.detailed_position,player.primary_position); player.save(update_fields=["primary_position","updated_at"])
         participation,_=PlayerFixture.objects.update_or_create(fixture=fixture,player=player,defaults={"team":teams[row.team_id],"opponent":teams[row.opponent_id],"position":normalize_position(row.position,row.player.detailed_position,player.primary_position),"started":row.started,"minutes":row.minutes})
         PlayerFixtureMetric.objects.bulk_create([PlayerFixtureMetric(player_fixture=participation,metric_key=metric.key,value=metric.value,
@@ -45,6 +56,10 @@ def sync_reference(provider,season):
     count={"competitions":0,"teams":0,"players":0}
     provider_name=provider.provider_name
     profile_positions=dict(PlayerPositionProfile.objects.filter(player__provider=provider_name).values_list("player__provider_id","position"))
+    aliases=resolve_provider_aliases(provider_name)
+    for review in latest_reviews().values():
+        pid=review.player.provider_id
+        if review.player.provider==provider_name and profile_positions.get(pid)=="UNKNOWN": profile_positions[pid]=review.position
     for competition in season.competitionseason_set.filter(competition__is_tracked=True,competition__provider=provider_name).select_related("competition"):
         if not competition.provider_season_id:
             candidates=provider.list_seasons(competition.competition.provider_id)
@@ -55,7 +70,9 @@ def sync_reference(provider,season):
         for team_data in provider.list_teams(competition.provider_season_id):
             team,_=Team.objects.update_or_create(provider=provider_name,provider_id=team_data.id,defaults={"name":team_data.name,"slug":slugify(team_data.name),"short_name":team_data.short_name,"country_code":team_data.country_code,"logo_url":team_data.logo_url}); TeamCompetitionSeason.objects.update_or_create(team=team,competition_season=competition,defaults={"active":True}); count["teams"]+=1
             for player_data in provider.list_players(team_data.id,competition.provider_season_id):
-                player,_=Player.objects.update_or_create(provider=provider_name,provider_id=player_data.id,defaults={"name":player_data.name,"first_name":player_data.first_name,"last_name":player_data.last_name,"common_name":player_data.common_name,"birth_date":player_data.birth_date,"image_url":player_data.image_url,"height_cm":player_data.height_cm,"primary_position":profile_positions.get(player_data.id,normalize_position(player_data.position,player_data.detailed_position)),"detailed_position":player_data.detailed_position})
+                player=aliases.get(str(player_data.id))
+                if player is None:
+                    player,_=Player.objects.update_or_create(provider=provider_name,provider_id=player_data.id,defaults={"name":player_data.name,"first_name":player_data.first_name,"last_name":player_data.last_name,"common_name":player_data.common_name,"birth_date":player_data.birth_date,"image_url":player_data.image_url,"height_cm":player_data.height_cm,"primary_position":profile_positions.get(str(player_data.id),normalize_position(player_data.position,player_data.detailed_position)),"detailed_position":player_data.detailed_position})
                 PlayerTeamSeason.objects.get_or_create(player=player,team=team,season=season,competition_season=competition); count["players"]+=1
     logger.info("reference_sync_complete provider=%s season=%s counts=%s",provider.provider_name,season.slug,count); return count
 

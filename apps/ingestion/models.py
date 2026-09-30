@@ -18,6 +18,29 @@ class PlayerPositionProfile(models.Model):
     checked_at=models.DateTimeField()
     reason=models.CharField(max_length=100,blank=True)
 
+class ReviewedPlayerPosition(models.Model):
+    player=models.ForeignKey(Player,on_delete=models.PROTECT,related_name="reviewed_positions")
+    position=models.CharField(max_length=10,choices=Position.choices)
+    source_path=models.CharField(max_length=500)
+    source_sha256=models.CharField(max_length=64)
+    reviewer=models.CharField(max_length=100)
+    reviewed_at=models.DateTimeField()
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["player","source_sha256"],name="uniq_reviewed_position_source")]
+    def save(self,*args,**kwargs):
+        from django.core.exceptions import ValidationError
+        if self.pk: raise ValidationError("Position reviews are immutable; record a new review.")
+        super().save(*args,**kwargs)
+
+class PlayerIdentityAlias(models.Model):
+    alias_player=models.OneToOneField(Player,on_delete=models.PROTECT,related_name="canonical_identity")
+    canonical_player=models.ForeignKey(Player,on_delete=models.PROTECT,related_name="provider_aliases")
+    source_path=models.CharField(max_length=500)
+    source_sha256=models.CharField(max_length=64)
+    reviewer=models.CharField(max_length=100)
+    reviewed_at=models.DateTimeField()
+    note=models.TextField()
+
 class StatsBombBacktestPayload(models.Model):
     resource_type=models.CharField(max_length=30); source_path=models.CharField(max_length=500,unique=True); payload=models.JSONField(); payload_sha256=models.CharField(max_length=64); imported_at=models.DateTimeField(auto_now=True)
     class Meta: indexes=[models.Index(fields=["resource_type"])]

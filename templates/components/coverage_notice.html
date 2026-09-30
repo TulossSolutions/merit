@@ -11,6 +11,6 @@
 {% endif %}
 {% if snapshot.coverage_summary.position_profiles.unavailable_players %}
 <aside class="notice" role="note" aria-label="Unavailable player profile positions">
-  <p>{{ snapshot.coverage_summary.position_profiles.unavailable_players }} player{{ snapshot.coverage_summary.position_profiles.unavailable_players|pluralize }} lack a verified profile position and are excluded from award categories, not assigned a guessed position. Their match statistics are retained.</p>
+  <p>{{ snapshot.coverage_summary.position_profiles.unavailable_players }} player{{ snapshot.coverage_summary.position_profiles.unavailable_players|pluralize }} lack a verified profile position{% if snapshot.coverage_summary.position_profiles.policy == 'profile_first_reviewed_fallback_all_imported_seasons' %} or an approved position review{% endif %} and are excluded from award categories, not assigned a guessed position. Their match statistics are retained.</p>
 </aside>
 {% endif %}
