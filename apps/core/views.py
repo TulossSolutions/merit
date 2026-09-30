@@ -1,6 +1,6 @@
 from django.db import connection
 from django.http import JsonResponse, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.views.decorators.cache import cache_page
 from apps.football.models import Position, Season
 from apps.rankings.services.queries import entries, latest_snapshot
@@ -8,8 +8,11 @@ from apps.scoring.models import ScoringFormula
 
 @cache_page(300)
 def home(request):
-    snapshot=latest_snapshot(); groups={p:entries(snapshot,p,5) for p in (Position.FWD,Position.MID,Position.DEF,Position.GK)}
-    return render(request,"core/home.html",{"snapshot":snapshot,"groups":groups,"page_title":"Merit — No votes. Just performance."})
+    seasons = Season.objects.filter(is_published=True, rankingsnapshot__is_public=True).distinct().order_by("-starts_on")
+    season_slug = request.GET.get("season")
+    season = get_object_or_404(seasons, slug=season_slug) if season_slug else None
+    snapshot=latest_snapshot(season); groups={p:entries(snapshot,p,5) for p in (Position.FWD,Position.MID,Position.DEF,Position.GK)}
+    return render(request,"core/home.html",{"snapshot":snapshot,"groups":groups,"seasons":seasons,"page_title":"Merit — No votes. Just performance."})
 def health(request):
     with connection.cursor() as cursor: cursor.execute("SELECT 1"); cursor.fetchone()
     return JsonResponse({"status":"ok"})

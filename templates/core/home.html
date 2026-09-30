@@ -19,8 +19,16 @@
       <dd>v{{ snapshot.formula.version }}</dd>
     </div>
     <div>
-      <dt>Season</dt>
-      <dd>{{ snapshot.season.name }}</dd>
+      <dt><label for="home-season">Season</label></dt>
+      <dd>
+        <form method="get" action="{% url 'home' %}">
+          <select id="home-season" name="season" onchange="this.form.submit()">
+            {% for season in seasons %}
+              <option value="{{ season.slug }}"{% if season.pk == snapshot.season_id %} selected{% endif %}>{{ season.name }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </dd>
     </div>
   </dl>
   {% endif %}
@@ -64,7 +72,7 @@
             {% endfor %}
           </ol>
 
-          <a class="ranking-link" href="{% if position == 'FWD' %}{% url 'ranking' 'attackers' %}{% elif position == 'MID' %}{% url 'ranking' 'midfielders' %}{% elif position == 'DEF' %}{% url 'ranking' 'defenders' %}{% else %}{% url 'ranking' 'goalkeepers' %}{% endif %}">
+          <a class="ranking-link" href="{% if position == 'FWD' %}{% url 'ranking' 'attackers' %}{% elif position == 'MID' %}{% url 'ranking' 'midfielders' %}{% elif position == 'DEF' %}{% url 'ranking' 'defenders' %}{% else %}{% url 'ranking' 'goalkeepers' %}{% endif %}?season={{ snapshot.season.slug }}">
             View full ranking <span aria-hidden="true">→</span>
           </a>
         {% else %}
