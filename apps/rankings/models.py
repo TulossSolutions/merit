@@ -4,6 +4,7 @@ from apps.football.models import Player, Position, Season, Team
 from apps.scoring.models import ScoringFormula
 
 class RankingSnapshot(models.Model):
+    coverage_summary=models.JSONField(default=dict)
     season=models.ForeignKey(Season,on_delete=models.PROTECT); formula=models.ForeignKey(ScoringFormula,on_delete=models.PROTECT,related_name="snapshots"); published_at=models.DateTimeField(); cutoff_at=models.DateTimeField(); is_public=models.BooleanField(default=False); created_at=models.DateTimeField(auto_now_add=True)
     class Meta: constraints=[models.UniqueConstraint(fields=["season","formula","cutoff_at"],name="uniq_ranking_snapshot")]
     def save(self,*args,**kwargs):

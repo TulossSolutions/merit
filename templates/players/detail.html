@@ -19,6 +19,8 @@
   {% endif %}
 </section>
 
+{% include 'components/coverage_notice.html' with snapshot=entry.snapshot %}
+
 {% if score and score.eligible %}
 <section>
   <div class="section-heading">

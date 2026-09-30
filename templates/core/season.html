@@ -6,6 +6,8 @@
   {% if snapshot %}<p class="home-deck">Latest public snapshot: {{ snapshot.cutoff_at|date:'j M Y' }}</p>{% endif %}
 </section>
 
+{% include 'components/coverage_notice.html' %}
+
 {% if snapshot %}
 <nav class="tabs" aria-label="Season positions">
   <a href="{% url 'ranking' 'attackers' %}?season={{ season.slug }}">Attackers</a>

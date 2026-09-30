@@ -158,12 +158,18 @@ a completed title final, never an arbitrary knockout match. Shootout duration ca
 explicit elapsed-time evidence (90/120); unknown duration remains unavailable.
 
 Empty/one-sided player payloads are retained but are not marked successfully ingested. Gaps are
-checkpointed and retried after seven days. A period with gaps is not labelled fully imported and does
-not receive a new public snapshot. Publication is also gated on campaign completeness, required
+checkpointed and retried after seven days. P1 option A (approved after the first production run) allows
+rankings from covered matches once every completed fixture has been attempted. Known unavailable
+player payloads are omitted from performance/availability scoring, never replaced with zeroes.
+Unprocessed fixtures still block publication. Snapshot coverage counts and missing competition/stage
+groups are persisted and displayed on ranking, homepage, player, comparison and season pages.
+A period with gaps is not labelled fully imported. Publication remains gated on campaign completeness, required
 outcomes and the existing data-quality checks. Other periods continue even if one is blocked.
 Campaigns spanning award periods are revalidated after older appearances arrive. v1.3 activates only
 after a verified new snapshot succeeds. The current-season default switches only after its snapshot exists.
 Raw archives and publication are distinct: importing data never rewrites published ranking entries.
+The archive alone opts into covered-match publication; other publication callers remain strict by default.
+Unknown outcomes, incomplete winning-team campaigns and other data-integrity errors still block publication.
 
 Provider documentation: [batch fixtures](https://www.api-football.com/news/post/how-to-get-all-fixtures-data-from-one-league),
 [quota and coverage](https://www.api-football.com/news/post/how-to-optimize-api-sports-calls-and-quota-usage).

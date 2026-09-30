@@ -3096,6 +3096,7 @@ Tournament/achievement extension (authorized after MVP): see [campaign contribut
 - MVP extension ✅ Persisted snapshot breakdown and player-page campaign credit.
 - MVP extension ✅ Resumable Pro archive command: batches of up to 20 fixtures, live quota/reserve checks, daily 03:00 UTC scheduler, six club and seven national competition types, season priorities and verified-publication gates.
 - MVP extension ✅ Public roadmap completion markers and methodology covering national award periods, separate Elo and trophy participation rules.
+- MVP extension ✅ P1 option A: covered-match archive rankings, immutable snapshot coverage notices, explicit omission of unavailable player payloads and unchanged winning-campaign completeness checks.
 - MVP extension ❌ Production activation and complete verified trophy/campaign data; historical snapshots remain untouched.
 
 The site is not trying to prove that mathematics eliminates every subjective choice in football analysis.

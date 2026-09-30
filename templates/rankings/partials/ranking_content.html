@@ -12,6 +12,8 @@
   </form>
 </section>
 
+{% include 'components/coverage_notice.html' %}
+
 <nav class="tabs" aria-label="Positions">
   <a href="{% url 'ranking' 'attackers' %}{% if snapshot %}?season={{ snapshot.season.slug }}{% endif %}" hx-get="{% url 'ranking' 'attackers' %}{% if snapshot %}?season={{ snapshot.season.slug }}{% endif %}" hx-target="#ranking-region" hx-push-url="true" {% if position_slug == 'attackers' %}aria-current="page"{% endif %}>Attackers</a>
   <a href="{% url 'ranking' 'midfielders' %}{% if snapshot %}?season={{ snapshot.season.slug }}{% endif %}" hx-get="{% url 'ranking' 'midfielders' %}{% if snapshot %}?season={{ snapshot.season.slug }}{% endif %}" hx-target="#ranking-region" hx-push-url="true" {% if position_slug == 'midfielders' %}aria-current="page"{% endif %}>Midfielders</a>

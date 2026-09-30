@@ -51,7 +51,7 @@ def compare(request):
     a=Player.objects.filter(slug=request.GET.get("a","")).first(); b=Player.objects.filter(slug=request.GET.get("b","")).first(); snapshot=latest_snapshot(); rows=[]
     for player in (a,b): rows.append(RankingEntry.objects.filter(snapshot=snapshot,player=player).select_related("player","team").first() if player and snapshot else None)
     template="players/partials/comparison.html" if request.headers.get("HX-Request")=="true" else "players/compare.html"
-    return render(request,template,{"a":a,"b":b,"rows":rows,"players":Player.objects.filter(ranking_entries__snapshot=snapshot).distinct().order_by("name") if snapshot else Player.objects.none(),"different_positions":a and b and a.primary_position!=b.primary_position,"page_title":"Compare players"})
+    return render(request,template,{"snapshot":snapshot,"a":a,"b":b,"rows":rows,"players":Player.objects.filter(ranking_entries__snapshot=snapshot).distinct().order_by("name") if snapshot else Player.objects.none(),"different_positions":a and b and a.primary_position!=b.primary_position,"page_title":"Compare players"})
 def player_search(request):
     q=request.GET.get("q","").strip(); qs=Player.objects.none()
     if len(q)>=2:

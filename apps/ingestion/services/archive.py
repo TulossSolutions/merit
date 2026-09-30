@@ -257,11 +257,11 @@ class ArchiveBackfill:
         return formula
 
     def publish_period(self,year,summary):
-        if summary["pending"] or summary["unavailable"] or not summary["loaded"]: return {"publication":"waiting_for_complete_player_data"}
+        if summary["pending"] or not summary["loaded"]: return {"publication":"waiting_for_complete_player_data"}
         season=ensure_award_period(year)
         if len([item for item in self.descriptors if item["family"]!="national" and item["cs"].season_id==season.pk])!=6:
             return {"publication":"no_complete_six_competition_period"}
-        latest=fixtures_for_award_period(season).filter(stats_ingested_at__isnull=False).order_by("-starts_at").first()
+        latest=fixtures_for_award_period(season).filter(status="FINISHED").order_by("-starts_at").first()
         cutoff=min(self.now,datetime.combine(latest.starts_at.date(),time.max,tzinfo=timezone.utc))
         formula=self.formula()
         try: prepare_season_achievements(season,cutoff,formula.config["achievements"])
@@ -269,7 +269,7 @@ class ArchiveBackfill:
         snapshot=RankingSnapshot.objects.filter(season=season,formula=formula,cutoff_at=cutoff,is_public=True).first()
         if not snapshot:
             try:
-                rebuild_elo(season); recompute_scores(season,formula,cutoff); snapshot=publish(season,formula,cutoff)
+                rebuild_elo(season); recompute_scores(season,formula,cutoff); snapshot=publish(season,formula,cutoff,allow_unavailable=True)
             except (ValueError,ValidationError) as exc:
                 return {"publication":"blocked_by_data_quality","reason":str(exc)}
         with transaction.atomic():
@@ -281,7 +281,7 @@ class ArchiveBackfill:
                 Season.objects.filter(pk=season.pk).update(is_current=True)
         from django.core.cache import cache
         cache.clear()
-        return {"publication":"published","snapshot":snapshot.pk,"formula":formula.version,"cutoff":cutoff.isoformat()}
+        return {"publication":"published","snapshot":snapshot.pk,"formula":formula.version,"cutoff":cutoff.isoformat(),"coverage":snapshot.coverage_summary}
 
     def run(self,prepare_only=False):
         self.state.last_error=""; self.state.save(update_fields=["last_error","updated_at"])

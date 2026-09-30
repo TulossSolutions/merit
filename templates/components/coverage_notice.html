@@ -1,0 +1,11 @@
+{% if snapshot.coverage_summary.incomplete %}
+<aside class="notice" role="note" aria-label="Incomplete player-stat coverage">
+  <p><strong>Incomplete coverage: {{ snapshot.coverage_summary.covered }} of {{ snapshot.coverage_summary.expected }} completed matches ({{ snapshot.coverage_summary.percent|floatformat:1 }}%).</strong> Rankings use covered matches only. {{ snapshot.coverage_summary.unavailable }} matches lack usable provider player statistics and are omitted, not treated as zero. Trophy credit still requires a complete winning-team campaign.</p>
+  <details>
+    <summary>Missing coverage by competition and stage</summary>
+    <ul class="list-disc pl-5">
+      {% for gap in snapshot.coverage_summary.gaps %}<li>{{ gap.competition }} · {{ gap.stage }}: {{ gap.fixtures }} match{{ gap.fixtures|pluralize:'es' }}</li>{% endfor %}
+    </ul>
+  </details>
+</aside>
+{% endif %}
