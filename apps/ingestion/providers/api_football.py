@@ -287,6 +287,9 @@ class ApiFootballProvider:
                 numerator, denominator = values.get("duels_won"), value
             elif key == "shots":
                 numerator, denominator = values.get("goals"), value
+                if numerator is not None and value>=0 and numerator>value:
+                    # Retain both provider counts, but never score an impossible conversion ratio.
+                    numerator = denominator = None
             elif key == "saves":
                 conceded = values.get("goals_conceded")
                 numerator, denominator = value, value + conceded if conceded is not None else None

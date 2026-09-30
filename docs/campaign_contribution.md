@@ -176,6 +176,14 @@ Provider documentation: [batch fixtures](https://www.api-football.com/news/post/
 
 ## Remaining limitations
 
+P2 consistency repair (approved separately) preserves provider goal and shot counts but makes impossible
+goal/shot conversion ratios unavailable instead of scoring them. Existing contradictions can be previewed
+with `python manage.py refresh_shot_conversion --season 2026-27`; add `--apply` to re-fetch at most
+60 affected fixtures in three batches, subject to the remaining quota/reserve. Only affected shot records
+are repaired: verified fresh shot totals can restore a ratio against the unchanged local goal count;
+otherwise ratio inputs become unavailable. Fresh responses and before/after repair evidence are retained.
+Goal counts, formula definitions, published snapshots and other player metrics are not rewritten.
+
 - Initial title values, cap and final weight are configured under the user's best-judgment authorization;
   they still need empirical backtesting. Publication and activation require the checks described above.
 - Summer national tournaments must be assigned to the season just ended, using verified edition dates.
