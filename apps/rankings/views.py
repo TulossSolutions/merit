@@ -1,6 +1,6 @@
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404,render
 from django.urls import reverse
 from django.views.decorators.cache import cache_page
@@ -29,11 +29,33 @@ def ranking(request,position_slug):
     template="rankings/partials/ranking_content.html" if request.headers.get("HX-Request")=="true" else "rankings/ranking_page.html"
     return render(request,template,context)
 def player_detail(request,slug):
-    player=get_object_or_404(Player,slug=slug); snapshot=latest_snapshot(); entry=RankingEntry.objects.filter(snapshot=snapshot,player=player).select_related("team").first() if snapshot else None
-    score=PlayerSeasonScore.objects.filter(player=player).select_related("formula").order_by("-as_of").first()
-    history_query=RankingEntry.objects.filter(player=player,snapshot__is_public=True).select_related("snapshot").order_by("snapshot__cutoff_at")
-    if snapshot: history_query=history_query.filter(snapshot__season=snapshot.season)
-    history=list(history_query)
+    player=get_object_or_404(Player,slug=slug)
+    public_entries=list(RankingEntry.objects.filter(player=player,snapshot__is_public=True,snapshot__season__is_published=True)
+        .select_related("snapshot__season","snapshot__formula","team")
+        .order_by("-snapshot__season__starts_on","-snapshot__cutoff_at","-snapshot__published_at","-snapshot_id"))
+    latest_by_season={}
+    for item in public_entries:
+        latest_by_season.setdefault(item.snapshot.season_id,item)
+    season_history=list(latest_by_season.values())
+    snapshot=latest_snapshot()
+    season_slug=request.GET.get("season")
+    if season_slug:
+        entry=next((item for item in season_history if item.snapshot.season.slug==season_slug),None)
+        if entry is None: raise Http404("No published ranking for this player in that season.")
+    else:
+        entry=next((item for item in public_entries if snapshot and item.snapshot_id==snapshot.pk),None)
+        if entry is None and season_history: entry=season_history[0]
+    if entry: snapshot=entry.snapshot
+    selected_season=snapshot.season if snapshot else None
+    score=None
+    if entry:
+        appearances=PlayerSeasonScore.objects.filter(player=player,season=snapshot.season,formula=snapshot.formula,
+            as_of=snapshot.cutoff_at,position=entry.position,eligible=True,minutes=entry.minutes,
+            final_score=entry.score).values_list("appearances",flat=True).first()
+        # Display the frozen publication, never a later or different-season calculation.
+        score={"season":snapshot.season,"formula":snapshot.formula,"as_of":snapshot.cutoff_at,"eligible":True,
+            "minutes":entry.minutes,"appearances":appearances,"metric_breakdown":entry.metric_breakdown,"context_summary":entry.context_summary}
+    history=[item for item in reversed(public_entries) if entry and item.snapshot.season_id==entry.snapshot.season_id]
     chart_points=[]; chart_dates=[]; chart_ranks=[]
     if history:
         low=min(item.rank for item in history); high=max(item.rank for item in history)
@@ -44,9 +66,11 @@ def player_detail(request,slug):
             chart_points.append({"x":round(x,1),"y":round(y,1),"item":item})
         chart_ranks=[{"value":rank,"y":round(150 if low==high else 40+(rank-low)/(high-low)*220,1)} for rank in dict.fromkeys((low,round((low+high)/2),high))]
         chart_dates=[chart_points[index] for index in dict.fromkeys((0,len(chart_points)//2,len(chart_points)-1))]
-    required_minutes=score.season.eligibility_minutes(score.as_of.date()) if score else None
+    required_minutes=selected_season.eligibility_minutes(snapshot.cutoff_at.date()) if score else None
     achievements=entry.context_summary.get("achievements",{}) if entry else {}
-    return render(request,"players/detail.html",{"player":player,"entry":entry,"score":score,"achievements":achievements,"chart_points":chart_points,"chart_dates":chart_dates,"chart_ranks":chart_ranks,"required_minutes":required_minutes,"page_title":player.name})
+    return render(request,"players/detail.html",{"player":player,"entry":entry,"score":score,"achievements":achievements,
+        "season_history":season_history,"seasons":[item.snapshot.season for item in season_history],"selected_season":selected_season,
+        "chart_points":chart_points,"chart_dates":chart_dates,"chart_ranks":chart_ranks,"required_minutes":required_minutes,"page_title":player.name})
 def compare(request):
     a=Player.objects.filter(slug=request.GET.get("a","")).first(); b=Player.objects.filter(slug=request.GET.get("b","")).first(); snapshot=latest_snapshot(); rows=[]
     for player in (a,b): rows.append(RankingEntry.objects.filter(snapshot=snapshot,player=player).select_related("player","team").first() if player and snapshot else None)

@@ -1,1 +1,1 @@
-<a class="no-underline hover:underline font-bold" href="{% url 'player_detail' player.slug %}">{{ player.name }}</a>
+<a class="no-underline hover:underline font-bold" href="{% url 'player_detail' player.slug %}{% if snapshot %}?season={{ snapshot.season.slug }}{% endif %}">{{ player.name }}</a>

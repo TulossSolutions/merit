@@ -61,7 +61,7 @@
                 <span class="rank-pill {% if entry.rank == 1 %}is-first{% endif %}">{{ entry.rank }}</span>
 
                 <div class="leader-player">
-                  <a href="{% url 'player_detail' entry.player.slug %}">{{ entry.player.name }}</a>
+                  <a href="{% url 'player_detail' entry.player.slug %}?season={{ snapshot.season.slug }}">{{ entry.player.name }}</a>
                 </div>
 
                 <div class="leader-score">

@@ -4,10 +4,19 @@
   <div class="flex items-start gap-4">
     {% if player.image_url %}<img class="player-image" src="{{ player.image_url }}" alt="{{ player.name }}">{% endif %}
     <div>
-      <p class="eyebrow">{{ player.get_primary_position_display }}</p>
+      <p class="eyebrow">{% if entry %}{{ entry.get_position_display }}{% else %}{{ player.get_primary_position_display }}{% endif %}</p>
       <h1>{{ player.name }}</h1>
       <p class="mt-2 text-sm text-muted">{{ entry.team.name|default:'Team unavailable' }}{% if player.nationality_code %} · {{ player.nationality_code }}{% endif %}</p>
-      <p class="mt-2 text-xs text-muted">{% if entry %}{% include 'components/movement.html' %} · {% endif %}{{ score.minutes|default:0 }} minutes · {{ score.appearances|default:0 }} appearances</p>
+      <p class="mt-2 text-xs text-muted">{% if entry %}{% include 'components/movement.html' %} · {% endif %}{{ score.minutes|default:0 }} minutes · {{ score.appearances|default_if_none:'—'|default:'—' }} appearances</p>
+      {% if seasons %}
+      <form method="get" action="{% url 'player_detail' player.slug %}" class="mt-4">
+        <label for="player-season">Season</label>
+        <select id="player-season" name="season" onchange="this.form.submit()">
+          {% for season in seasons %}<option value="{{ season.slug }}"{% if season.pk == selected_season.pk %} selected{% endif %}>{{ season.name }}</option>{% endfor %}
+        </select>
+      </form>
+      <p class="mt-2 text-xs text-muted">Updated {{ entry.snapshot.cutoff_at|date:'j M Y' }} · Formula v{{ entry.snapshot.formula.version }}</p>
+      {% endif %}
     </div>
   </div>
   {% if entry %}
@@ -61,9 +70,26 @@
 {% endif %}
 
 <section class="mt-12">
+  <div class="section-heading"><h2>Season history</h2><p>Latest published ranking in each season.</p></div>
+  {% if season_history %}
+  <div class="table-wrap"><table>
+    <thead><tr><th scope="col">Season</th><th scope="col">Role</th><th scope="col">Rank</th><th scope="col">Score</th><th scope="col">Updated</th></tr></thead>
+    <tbody>
+      {% for historical in season_history %}
+      <tr{% if historical.snapshot.season_id == selected_season.pk %} class="font-bold"{% endif %}>
+        <td><a href="{% url 'player_detail' player.slug %}?season={{ historical.snapshot.season.slug }}"{% if historical.snapshot.season_id == selected_season.pk %} aria-current="page"{% endif %}>{{ historical.snapshot.season.name }}</a></td>
+        <td>{{ historical.get_position_display }}</td><td>#{{ historical.rank }}</td><td>{{ historical.score|floatformat:2 }}</td><td>{{ historical.snapshot.cutoff_at|date:'j M Y' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="text-sm text-muted">No published season rankings yet.</p>{% endif %}
+</section>
+
+<section class="mt-12">
   <div class="section-heading">
     <div><p class="eyebrow">Weekly progress</p><h2>Season ranking history</h2></div>
-    <p>Better ranks appear higher.</p>
+    <p>{% if selected_season %}{{ selected_season.name }} · {% endif %}Better ranks appear higher.</p>
   </div>
   {% if chart_points %}
   <div class="border-y border-line py-5 overflow-x-auto">
