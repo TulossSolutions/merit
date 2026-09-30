@@ -58,6 +58,7 @@ class ApiFootballProvider:
         self.base_url = settings.API_FOOTBALL_BASE_URL.rstrip("/")
         self.client = client or httpx.Client(timeout=20)
         self.quota_remaining = None
+        self.quota_reserve = 0
         self.requests_made = 0
         self.request_budget = None
         self.min_request_interval = 0.0
@@ -68,6 +69,8 @@ class ApiFootballProvider:
         self.min_request_interval = max(0.0, float(min_interval))
 
     def _before_request(self):
+        if self.quota_remaining is not None and self.quota_remaining <= self.quota_reserve:
+            raise ProviderRequestLimitReached("API-Football daily reserve reached")
         if self.request_budget is not None and self.requests_made >= self.request_budget:
             raise ProviderRequestLimitReached("Configured API-Football request budget reached")
         if self._last_request_at is not None and self.min_request_interval:
@@ -121,6 +124,27 @@ class ApiFootballProvider:
             payload = self._request(path, {**(params or {}), "page": page})
             rows.extend(payload.get("response") or [])
         return rows
+
+    def get_profile_page(self, page=1):
+        if page < 1: raise ValueError("Profile page must be positive")
+        payload=self._request("players/profiles",{"page":page})
+        paging=payload.get("paging") or {}
+        rows=payload.get("response")
+        if not isinstance(rows,list) or not rows or paging.get("current")!=page or not isinstance(paging.get("total"),int) or paging["total"]<page:
+            raise ValueError("Invalid player-profile pagination response")
+        if len(rows)>250 or payload.get("results")!=len(rows):
+            raise ValueError("Invalid player-profile page size")
+        ids=[]
+        for row in rows:
+            player=row.get("player") or {}
+            if not isinstance(player.get("id"),int) or player["id"]<1:
+                raise ValueError("Invalid player-profile identity")
+            position=player.get("position")
+            if position is not None and (not isinstance(position,str) or len(position)>100):
+                raise ValueError("Invalid player-profile position")
+            ids.append(player["id"])
+        if len(ids)!=len(set(ids)): raise ValueError("Duplicate players in profile page")
+        return payload
 
     def list_competitions(self):
         output = []

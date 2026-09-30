@@ -25,6 +25,7 @@ from apps.scoring.services.campaigns import validate_campaign_policy
 from apps.scoring.services.elo import rebuild_elo
 from apps.scoring.services.formulas import validate_formula
 from .sync import ingest_fixture_bundle
+from .profiles import ProfileCatalogue
 
 CLUB_IDS={"39","140","135","78","61","2"}  # Verified provider catalog IDs.
 NATIONAL_NAMES={"World Cup","Euro Championship","Copa America","Africa Cup of Nations","Asian Cup","CONCACAF Gold Cup","UEFA Nations League"}
@@ -67,6 +68,7 @@ class ArchiveBackfill:
         self.progress.update(status="running",started_at=self.now.isoformat(),priority_order=self.priorities())
         self.descriptors=[]
         self.memberships=set(TeamCompetitionSeason.objects.values_list("team_id","competition_season_id"))
+        self.profile_catalogue=None
 
     def priorities(self):
         years=list(range(self.current_year,self.first_year-1,-1))
@@ -85,6 +87,7 @@ class ArchiveBackfill:
         allowed=min(self.budget,max(0,remaining-reserve))
         if allowed<1: raise ProviderRequestLimitReached("Daily reserve reached; resume after the quota reset")
         self.provider.configure_request_limits(min(self.budget,self.provider.requests_made+allowed),max(self.interval,6.1 if daily<=100 else 0.25))
+        self.provider.quota_reserve=reserve
         self.checkpoint(daily_limit=daily,reserve=reserve,effective_budget=self.provider.request_budget)
 
     def expired(self): return clock.monotonic()>=self.deadline
@@ -249,11 +252,11 @@ class ArchiveBackfill:
                 "verified_at":django_timezone.now(),"evidence":json.dumps(evidence,sort_keys=True),"expected_matches":len(expected),"is_complete":complete})
 
     def formula(self):
-        path=settings.BASE_DIR/"scoring_formulas"/"v1_3.json"
+        path=settings.BASE_DIR/"scoring_formulas"/"v1_4.json"
         with path.open(encoding="utf8") as handle: config=json.load(handle)
         checksum=validate_formula(config)
         formula,created=ScoringFormula.objects.get_or_create(version=config["version"],defaults={"name":config["name"],"config":config,"checksum_sha256":checksum,"notes":config.get("notes","")})
-        if not created and formula.checksum_sha256!=checksum: raise ValidationError("Immutable formula v1.3 already has different rules")
+        if not created and formula.checksum_sha256!=checksum: raise ValidationError("Immutable formula v1.4 already has different rules")
         return formula
 
     def publish_period(self,year,summary):
@@ -264,6 +267,10 @@ class ArchiveBackfill:
         latest=fixtures_for_award_period(season).filter(status="FINISHED").order_by("-starts_at").first()
         cutoff=min(self.now,datetime.combine(latest.starts_at.date(),time.max,tzinfo=timezone.utc))
         formula=self.formula()
+        if formula.config.get("position_source")=="api_football_profile":
+            if self.profile_catalogue is None:
+                return {"publication":"waiting_for_verified_player_profiles"}
+            self.profile_catalogue.apply_profiles()
         try: prepare_season_achievements(season,cutoff,formula.config["achievements"])
         except ValidationError as exc: return {"publication":"waiting_for_verified_trophies","reason":str(exc)}
         snapshot=RankingSnapshot.objects.filter(season=season,formula=formula,cutoff_at=cutoff,is_public=True).first()
@@ -289,6 +296,9 @@ class ArchiveBackfill:
             self.limits(); self.prepare()
             if prepare_only:
                 self.checkpoint(status="prepared"); return self.progress
+            self.profile_catalogue=ProfileCatalogue(self.provider,now=self.now,expired=self.expired,report=self.report)
+            profiles=self.profile_catalogue.sync()
+            self.checkpoint(profile_catalogue=profiles)
             for year in self.priorities():
                 if year<self.first_year or year>self.current_year: continue
                 summary=self.ingest_period(year)

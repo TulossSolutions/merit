@@ -22,8 +22,13 @@ def publish(season,formula,cutoff,force=False,*,allow_unavailable=False):
     scores=list(PlayerSeasonScore.objects.filter(season=season,formula=formula,as_of=cutoff,eligible=True,final_score__isnull=False).select_related("player").order_by("position","-final_score","-performance_score","-minutes","player_id"))
     if not scores: raise ValueError("No eligible scores exist for the exact cutoff")
     previous=RankingSnapshot.objects.filter(season=season,is_public=True,cutoff_at__lt=cutoff).order_by("-cutoff_at").first(); old={(e.position,e.player_id):e.rank for e in previous.entries.all()} if previous else {}
+    coverage=snapshot_coverage(season,cutoff,allow_unavailable)
+    if formula.config.get("position_source")=="api_football_profile":
+        unknown=list(PlayerSeasonScore.objects.filter(season=season,formula=formula,as_of=cutoff,position=Position.UNKNOWN).values_list("minutes",flat=True))
+        coverage["position_profiles"]={"source":"api_football.players/profiles.position","unavailable_players":len(unknown),
+            "unavailable_minutes":sum(unknown),"policy":"current_profile_all_imported_seasons"}
     snapshot=RankingSnapshot.objects.create(season=season,formula=formula,published_at=timezone.now(),cutoff_at=cutoff,is_public=False,
-        coverage_summary=snapshot_coverage(season,cutoff,allow_unavailable))
+        coverage_summary=coverage)
     by_position={p:[] for p in (Position.GK,Position.DEF,Position.MID,Position.FWD)}
     for score in scores: by_position[score.position].append(score)
     entries=[]
