@@ -129,7 +129,12 @@ class ApiFootballProvider:
             country = row.get("country") or {}
             if not league.get("id"):
                 continue
-            kind = "DOMESTIC_LEAGUE" if league.get("type") == "League" else "UCL"
+            if league.get("name") == "UEFA Champions League":
+                kind = "UCL"
+            elif league.get("type") == "League":
+                kind = "DOMESTIC_LEAGUE"
+            else:
+                kind = "CUP" if league.get("type") == "Cup" else "UNKNOWN"
             country_code = country.get("code")
             if country_code and len(country_code) > 3:
                 country_code = None
@@ -196,6 +201,16 @@ class ApiFootballProvider:
         payload = {"fixture": fixture_data, "players": player_payload}
         return self.normalize_fixture(payload)
 
+    def get_fixture_batch(self, fixtures):
+        ids=[item.id for item in fixtures]
+        if not ids or len(ids)>20 or len(set(ids))!=len(ids):
+            raise ValueError("Fixture batches require 1–20 unique IDs")
+        rows=self._all("fixtures",{"ids":"-".join(ids)})
+        by_id={str(row["fixture"]["id"]):row for row in rows}
+        if len(rows)!=len(ids) or set(by_id)!=set(ids):
+            raise ValueError("Batch response does not match the requested fixture IDs")
+        return [self.normalize_fixture({"fixture":by_id[value],"players":{"response":by_id[value].get("players") or []}}) for value in ids]
+
     def _normalize_fixture_meta(self, data, provider_season_id=None):
         fixture = data.get("fixture") or {}
         league = data.get("league") or {}
@@ -210,6 +225,7 @@ class ApiFootballProvider:
             ProviderTeam(str(teams["away"]["id"]), teams["away"]["name"], logo_url=teams["away"].get("logo")),
             starts_at, STATUS_MAP.get(status, "SCHEDULED"), goals.get("home"), goals.get("away"),
             league.get("round"), league.get("round"), data,
+            available_minutes=90 if status=="FT" else 120 if status=="AET" else (fixture.get("status") or {}).get("elapsed") if status=="PEN" and (fixture.get("status") or {}).get("elapsed") in (90,120) else None,
         )
 
     def normalize_fixture(self, payload):

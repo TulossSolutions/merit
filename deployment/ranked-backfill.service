@@ -1,0 +1,13 @@
+[Unit]
+Description=Merit quota-bounded club and national archive backfill
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=contabo
+Group=www-data
+WorkingDirectory=/var/www/x.tuloss.com/ranked
+EnvironmentFile=/var/www/x.tuloss.com/ranked/.env
+ExecStart=/var/www/x.tuloss.com/ranked/.venv/bin/python manage.py backfill_archive --daily-call-budget 7000 --reserve 500 --request-interval 0.25 --max-runtime 21600
+TimeoutStartSec=8h

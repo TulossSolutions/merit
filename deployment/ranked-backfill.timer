@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Merit archive catch-up daily at 03:00 UTC
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+Persistent=true
+Unit=ranked-backfill.service
+
+[Install]
+WantedBy=timers.target

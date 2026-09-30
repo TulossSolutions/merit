@@ -71,6 +71,19 @@ python manage.py backfill_season --season 2024-25 --from 2024-08-01 --to 2025-05
 
 The initial backfill should load a prior season when the API quota permits, rebuild Elo chronologically, then ingest and score the current season. If prior history is unavailable, Elo starts at 1500 and stabilizes as cross-league fixtures accumulate.
 
+For the Pro archive, use the resumable batch command. It prioritizes completing 2024/25, then the current
+season, 2025/26, and earlier covered seasons down to 2015/16, with seven national-team competitions.
+It preserves published snapshots and activates trophy formula v1.3 only after verified campaign data
+passes publication checks. Set `FORMULA_VERSION=1.3` for subsequent scheduled scoring after activation.
+
+```bash
+python manage.py backfill_archive --daily-call-budget 7000 --reserve 500 --request-interval 0.25 --max-runtime 21600
+```
+
+See [campaign contribution and archive operations](docs/campaign_contribution.md) for the national
+calendar, title values, participation rules and coverage limitations. `deployment/ranked-backfill.service`
+and its timer replace the single-season job and run daily at 03:00 UTC.
+
 ## StatsBomb Open Data backtesting
 
 StatsBomb Open Data is imported only into an isolated backtesting store; it never publishes rankings or mixes with API-Football operational rows. Download the official Open Data repository separately, preserve StatsBomb attribution in any published research, and run:

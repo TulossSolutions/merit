@@ -13,7 +13,7 @@ logger=logging.getLogger(__name__)
 @transaction.atomic
 def publish(season,formula,cutoff,force=False):
     if validate_formula(formula.config)!=formula.checksum_sha256: raise ValueError("Formula checksum does not match its immutable configuration")
-    fatal=[issue for issue in check_quality(season) if issue[0]=="ERROR"]
+    fatal=[issue for issue in check_quality(season,cutoff) if issue[0]=="ERROR"]
     if fatal: raise ValueError(f"Fatal data-quality errors block publication: {fatal}")
     existing=RankingSnapshot.objects.filter(season=season,formula=formula,cutoff_at=cutoff).first()
     if existing and not force: raise ValueError("Snapshot already exists; published snapshots are immutable")
@@ -27,7 +27,7 @@ def publish(season,formula,cutoff,force=False):
     entries=[]
     for position,position_scores in by_position.items():
         for rank,score in enumerate(position_scores,start=1):
-            team=PlayerFixture.objects.filter(player=score.player,fixture__starts_at__lte=cutoff).order_by("-fixture__starts_at","-fixture_id").values_list("team_id",flat=True).first(); prior=old.get((position,score.player_id))
+            team=PlayerFixture.objects.filter(player=score.player,fixture__starts_at__lte=cutoff).exclude(fixture__competition_season__competition__participant_type="NATIONAL").order_by("-fixture__starts_at","-fixture_id").values_list("team_id",flat=True).first(); prior=old.get((position,score.player_id))
             entries.append(RankingEntry(snapshot=snapshot,player=score.player,team_id=team,position=position,rank=rank,score=score.final_score,previous_rank=prior,movement=prior-rank if prior else None,minutes=score.minutes,metric_breakdown=score.metric_breakdown,context_summary=score.context_summary))
     RankingEntry.objects.bulk_create(entries); RankingSnapshot.objects.filter(pk=snapshot.pk).update(is_public=True); snapshot.is_public=True
     if not season.is_published:

@@ -19,7 +19,7 @@ class ProviderMetric: key:str; value:Decimal|None=None; numerator:Decimal|None=N
 @dataclass(frozen=True)
 class ProviderParticipation: player:ProviderPlayer; team_id:str; opponent_id:str; position:str|None; started:bool; minutes:int; metrics:tuple[ProviderMetric,...]=field(default_factory=tuple)
 @dataclass(frozen=True)
-class ProviderFixture: id:str; season_id:str; home_team:ProviderTeam; away_team:ProviderTeam; starts_at:datetime; status:str; home_score:int|None=None; away_score:int|None=None; stage_name:str|None=None; round_name:str|None=None; raw_payload:dict=field(default_factory=dict,compare=False)
+class ProviderFixture: id:str; season_id:str; home_team:ProviderTeam; away_team:ProviderTeam; starts_at:datetime; status:str; home_score:int|None=None; away_score:int|None=None; stage_name:str|None=None; round_name:str|None=None; raw_payload:dict=field(default_factory=dict,compare=False); available_minutes:int|None=None
 @dataclass(frozen=True)
 class ProviderFixtureBundle: fixture:ProviderFixture; participations:tuple[ProviderParticipation,...]; raw_payload:dict=field(default_factory=dict)
 

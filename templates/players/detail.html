@@ -47,6 +47,17 @@
   {% include 'components/eligibility_notice.html' %}
 {% endif %}
 
+{% if achievements.enabled %}
+<section class="mt-12">
+  <div class="section-heading"><h2>Title campaign contribution</h2><p>Achievement score: {{ achievements.score|floatformat:2 }}</p></div>
+  <p>Participation is weighted by match context across the winning team's full campaign, including matches missed.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th scope="col">Competition</th><th scope="col">Winning team</th><th scope="col">Campaign contribution</th><th scope="col">Title points</th><th scope="col">Earned points</th></tr></thead>
+    <tbody>{% for campaign in achievements.campaigns %}<tr><td>{{ campaign.competition }}</td><td>{{ campaign.team }}</td><td>{{ campaign.contribution_percent|floatformat:2 }}%</td><td>{{ campaign.title_points }}</td><td>{{ campaign.earned_points|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="5">No verified titles earned by this player at this cutoff.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endif %}
+
 <section class="mt-12">
   <div class="section-heading">
     <div><p class="eyebrow">Weekly progress</p><h2>Season ranking history</h2></div>

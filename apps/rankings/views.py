@@ -45,7 +45,8 @@ def player_detail(request,slug):
         chart_ranks=[{"value":rank,"y":round(150 if low==high else 40+(rank-low)/(high-low)*220,1)} for rank in dict.fromkeys((low,round((low+high)/2),high))]
         chart_dates=[chart_points[index] for index in dict.fromkeys((0,len(chart_points)//2,len(chart_points)-1))]
     required_minutes=score.season.eligibility_minutes(score.as_of.date()) if score else None
-    return render(request,"players/detail.html",{"player":player,"entry":entry,"score":score,"chart_points":chart_points,"chart_dates":chart_dates,"chart_ranks":chart_ranks,"required_minutes":required_minutes,"page_title":player.name})
+    achievements=entry.context_summary.get("achievements",{}) if entry else {}
+    return render(request,"players/detail.html",{"player":player,"entry":entry,"score":score,"achievements":achievements,"chart_points":chart_points,"chart_dates":chart_dates,"chart_ranks":chart_ranks,"required_minutes":required_minutes,"page_title":player.name})
 def compare(request):
     a=Player.objects.filter(slug=request.GET.get("a","")).first(); b=Player.objects.filter(slug=request.GET.get("b","")).first(); snapshot=latest_snapshot(); rows=[]
     for player in (a,b): rows.append(RankingEntry.objects.filter(snapshot=snapshot,player=player).select_related("player","team").first() if player and snapshot else None)

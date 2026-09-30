@@ -1,0 +1,29 @@
+{
+  "version": "national-major-title-1.0",
+  "config": {
+    "stage_weights": {
+      "group": "1",
+      "r16": "1.15",
+      "quarter": "1.30",
+      "semi": "1.50",
+      "final": "1.75"
+    },
+    "stage_aliases": {
+      "group stage - 1": "group",
+      "group stage - 2": "group",
+      "group stage - 3": "group",
+      "round of 16": "r16",
+      "quarter-finals": "quarter",
+      "semi-finals": "semi",
+      "final": "final"
+    },
+    "performance_stage_weights": {
+      "group": "1",
+      "r16": "1.05",
+      "quarter": "1.08",
+      "semi": "1.10",
+      "final": "1.15"
+    },
+    "title_points": "5"
+  }
+}

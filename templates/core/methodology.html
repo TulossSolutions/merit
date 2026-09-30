@@ -9,7 +9,32 @@
 <div class="grid lg:grid-cols-[1fr_18rem] gap-8 items-start">
   <div class="prose">
     <p>Positions are ranked separately. External match statistics are normalized per 90, and positive counts are adjusted for pre-match opponent Elo, domestic league strength, and Champions League stage. Metrics become percentiles within the same position cohort.</p>
-    <p>Missing provider metrics are disabled cohort-wide below {{ formula.config.coverage_threshold|default:'0.15' }} coverage and their weight is redistributed; absence is never silently treated as zero. Availability contributes {{ formula.config.availability_weight|default:'0.08' }} of the result, while eligibility minutes scale with season progress. Rankings are versioned weekly snapshots.</p>
+    <p>Missing provider metrics are disabled cohort-wide below {{ formula.config.coverage_threshold|default:'0.15' }} coverage and their weight is redistributed; absence is never silently treated as zero. The base score blends performance (92%) and availability (8%), while eligibility minutes scale with season progress. Rankings are versioned snapshots: daily backfill publications simulate the eventual weekly updates, and movement compares with the preceding published snapshot in the same season.</p>
+
+    <h2>National tournaments and award periods</h2>
+    <p>Alongside the five domestic leagues and Champions League, Merit supports the World Cup, Euros, Copa América, Africa Cup of Nations, Asian Cup, CONCACAF Gold Cup and UEFA Nations League wherever player statistics are available. Coverage is checked per provider edition, not assumed from the competition name. Separate qualification competitions and friendlies are not included in this archive scope; qualifiers bundled into an edition are retained and identified by stage.</p>
+    <p>National-team appearances belong to the award period of the actual match date, not simply the provider's edition label. June and July tournaments close the season just ended: the 2026 World Cup belongs to 2025/26, while the December 2022 World Cup belongs to 2022/23. Multi-year editions can therefore contribute performance to more than one season. A title belongs to the period in which it is awarded, and its contribution uses the entire winning campaign.</p>
+    <p>Club and national teams have separate Elo pools. National teams do not affect domestic league-strength comparisons, and national league-strength multipliers stay at 1. Centralized national-tournament matches and Nations League final-four matches are treated as neutral, with no nominal home advantage; Nations League home-and-away rounds retain home advantage. National performance-stage factors are 1.00 for group/qualification/playoff rounds, 1.05 for round of 16, 1.08 for quarterfinals, 1.10 for semifinals and 1.15 for the final. Existing club performance-context rules are preserved.</p>
+
+    <h2>Trophies: participation, not reputation</h2>
+    {% if formula.config.achievements.enabled %}
+    <p>Formula v{{ formula.version }} includes a {% widthratio formula.config.achievements.weight 1 100 %}% achievement component. Historical snapshots retain the formula with which they were published.</p>
+    {% else %}
+    <p>The v1.3 trophy rules are implemented and activate only when the required competition outcomes and winning campaigns are verified. The active formula shown below does not yet include trophies. Existing published snapshots are not rewritten.</p>
+    {% endif %}
+    <ul>
+      <li>A completed domestic league title is worth 3 points; Champions League and the seven included national-team titles are worth 5 points.</li>
+      <li>Each title's points are multiplied by the player's normalized campaign contribution, not granted to everyone on the winning squad.</li>
+      <li>Earned points are summed and capped at 10, then converted to an achievement score from 0 to 100.</li>
+      <li>The final score is 95% of the existing performance/availability blend plus 5% achievement score.</li>
+    </ul>
+    <p><code>participation = min(1, player minutes / available match minutes)</code><br><code>campaign contribution = sum(participation × stage weight) / sum(stage weight)</code></p>
+    <p>The denominator includes every match in the winning team's campaign, including games the player missed. A registered player who never plays receives zero. Extra-time matches use 120 minutes; regulation matches use 90. Penalty-shootout status alone does not establish duration: elapsed-time evidence is required. Goals, assists and other performance metrics are not counted again in trophy credit.</p>
+    <p>Contribution weights are 1.00 for league/group/qualification rounds, 1.10 for knockout playoffs or round of 32, 1.15 for round of 16, 1.30 for quarterfinals, 1.50 for semifinals and 1.75 for the final. Exact provider-stage aliases and these weights are retained in immutable, checksummed policies.</p>
+    <p>League winners require final standings after a complete league campaign; cup winners require a completed title final with an explicit winning team. Titles enter the score only after the award date. Missing outcomes, minutes, player payloads or unknown stages do not become invented points: they block trophy publication and remain recorded for review. The weights are transparent modelling choices, not a claim that every subjective choice disappears.</p>
+
+    <h2>Historical coverage and reproducibility</h2>
+    <p>The archive targets 2015/16–2025/26 across all six club competitions, plus completed 2026/27 matches and available national editions. Import support does not mean every season is already loaded: provider gaps are recorded explicitly. Raw responses are retained, repeated imports skip completed fixtures, and new rankings are published under a new formula version without replacing old snapshots. Player pages explain earned title points and campaign participation from the published snapshot.</p>
 
     {% if formula %}
       <h2>Formula v{{ formula.version }}</h2>

@@ -8,6 +8,7 @@ from apps.football.models import CompetitionSeason, Fixture, Player, PlayerFixtu
 from apps.ingestion.models import RawProviderPayload
 from apps.ingestion.providers.base import ProviderRequestLimitReached
 from apps.ingestion.providers.positions import normalize_position
+from apps.football.award_periods import award_year,ensure_award_period
 
 logger=logging.getLogger(__name__)
 
@@ -20,13 +21,24 @@ def ingest_fixture_bundle(bundle, competition_season, provider="mock", request_p
     for data in (bundle.fixture.home_team,bundle.fixture.away_team):
         teams[data.id],_=Team.objects.update_or_create(provider=provider,provider_id=data.id,defaults={"name":data.name,"slug":slugify(data.name),"short_name":data.short_name,"country_code":data.country_code,"logo_url":data.logo_url})
     fixture,_=Fixture.objects.update_or_create(provider=provider,provider_id=bundle.fixture.id,defaults={"competition_season":competition_season,"home_team":teams[bundle.fixture.home_team.id],"away_team":teams[bundle.fixture.away_team.id],"starts_at":bundle.fixture.starts_at,"status":bundle.fixture.status,"home_score":bundle.fixture.home_score,"away_score":bundle.fixture.away_score,"stage_name":bundle.fixture.stage_name,"round_name":bundle.fixture.round_name})
+    if competition_season.competition.participant_type=="NATIONAL":
+        fixture.award_season=ensure_award_period(award_year(fixture.starts_at.date()))
+        fixture.save(update_fields=["award_season","updated_at"])
+    if bundle.fixture.available_minutes is not None:
+        fixture.available_minutes=bundle.fixture.available_minutes
+        fixture.save(update_fields=["available_minutes","updated_at"])
     for row in bundle.participations:
         player,created=Player.objects.get_or_create(provider=provider,provider_id=row.player.id,defaults={"name":row.player.name,"slug":"","first_name":row.player.first_name,"last_name":row.player.last_name,"common_name":row.player.common_name,"birth_date":row.player.birth_date,"image_url":row.player.image_url,"height_cm":row.player.height_cm,"primary_position":normalize_position(row.position,row.player.detailed_position),"detailed_position":row.player.detailed_position})
         if not created and player.primary_position=="UNKNOWN": player.primary_position=normalize_position(row.position,row.player.detailed_position,player.primary_position); player.save(update_fields=["primary_position","updated_at"])
         participation,_=PlayerFixture.objects.update_or_create(fixture=fixture,player=player,defaults={"team":teams[row.team_id],"opponent":teams[row.opponent_id],"position":normalize_position(row.position,row.player.detailed_position,player.primary_position),"started":row.started,"minutes":row.minutes})
-        for metric in row.metrics:
-            PlayerFixtureMetric.objects.update_or_create(player_fixture=participation,metric_key=metric.key,defaults={"value":metric.value,"numerator":metric.numerator,"denominator":metric.denominator,"is_available":metric.available,"source_type_id":metric.source_type_id})
-    fixture.stats_ingested_at=timezone.now(); fixture.save(update_fields=["stats_ingested_at","updated_at"]); return fixture
+        PlayerFixtureMetric.objects.bulk_create([PlayerFixtureMetric(player_fixture=participation,metric_key=metric.key,value=metric.value,
+            numerator=metric.numerator,denominator=metric.denominator,is_available=metric.available,source_type_id=metric.source_type_id) for metric in row.metrics],
+            update_conflicts=True,unique_fields=["player_fixture","metric_key"],update_fields=["value","numerator","denominator","is_available","source_type_id","updated_at"])
+    teams_with_minutes={row.team_id for row in bundle.participations if row.minutes>0}
+    usable=provider!="api_football" or teams_with_minutes=={bundle.fixture.home_team.id,bundle.fixture.away_team.id}
+    fixture.stats_ingested_at=timezone.now() if usable else None
+    fixture.player_data_unavailable_at=None if usable else timezone.now()
+    fixture.save(update_fields=["stats_ingested_at","player_data_unavailable_at","updated_at"]); return fixture
 
 def sync_reference(provider,season):
     logger.info("reference_sync_start provider=%s season=%s",provider.provider_name,season.slug)

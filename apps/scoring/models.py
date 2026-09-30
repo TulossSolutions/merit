@@ -12,6 +12,8 @@ class ScoringFormula(models.Model):
     def __str__(self): return f"v{self.version}"
 
 class PlayerSeasonScore(models.Model):
+    achievement_score=models.DecimalField(max_digits=8,decimal_places=4,blank=True,null=True)
+    achievement_breakdown=models.JSONField(default=dict)
     season=models.ForeignKey(Season,on_delete=models.CASCADE); player=models.ForeignKey(Player,on_delete=models.CASCADE); formula=models.ForeignKey(ScoringFormula,on_delete=models.PROTECT); position=models.CharField(max_length=10,choices=Position.choices); as_of=models.DateTimeField(); eligible=models.BooleanField(); minutes=models.PositiveIntegerField(); appearances=models.PositiveIntegerField(); performance_score=models.DecimalField(max_digits=8,decimal_places=4,blank=True,null=True); availability_score=models.DecimalField(max_digits=8,decimal_places=4,blank=True,null=True); final_score=models.DecimalField(max_digits=8,decimal_places=4,blank=True,null=True); metric_breakdown=models.JSONField(default=dict); coverage_breakdown=models.JSONField(default=dict); context_summary=models.JSONField(default=dict); calculated_at=models.DateTimeField(auto_now=True)
     class Meta:
         constraints=[models.UniqueConstraint(fields=["season","player","formula","as_of"],name="uniq_player_season_score")]

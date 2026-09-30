@@ -4,6 +4,8 @@ import logging
 from django.db import transaction
 from apps.football.models import Competition, PlayerFixture, Position
 from apps.scoring.models import PlayerSeasonScore
+from .achievements import prepare_season_achievements,season_achievement
+from apps.football.award_periods import fixtures_for_award_period
 
 logger=logging.getLogger(__name__)
 
@@ -38,7 +40,8 @@ def _aggregate(rows,metric):
 @transaction.atomic
 def recompute_scores(season,formula,as_of):
     logger.info("score_calculation_start season=%s formula=%s cutoff=%s",season.slug,formula.version,as_of)
-    rows=PlayerFixture.objects.filter(fixture__competition_season__season=season,fixture__competition_season__competition__is_tracked=True,fixture__status="FINISHED",fixture__starts_at__lte=as_of,fixture__stats_ingested_at__isnull=False).select_related("fixture","fixture__competition_season__competition","player").prefetch_related("metrics").order_by("fixture__starts_at","fixture_id","player_id")
+    prepared_achievements=prepare_season_achievements(season,as_of,formula.config.get("achievements"))
+    rows=PlayerFixture.objects.filter(fixture__in=fixtures_for_award_period(season),fixture__competition_season__competition__is_tracked=True,fixture__status="FINISHED",fixture__starts_at__lte=as_of,fixture__stats_ingested_at__isnull=False).select_related("fixture","fixture__competition_season__competition","player").prefetch_related("metrics").order_by("fixture__starts_at","fixture_id","player_id")
     grouped=defaultdict(list)
     for row in rows: grouped[(row.position,row.player_id)].append(row)
     configs=formula.config; output=[]
@@ -64,7 +67,13 @@ def recompute_scores(season,formula,as_of):
                 if score is not None: performance+=score*effective
                 breakdown[key]={"label":metric["label"],"raw_value":float(aggregate[pid][key]) if aggregate[pid][key] is not None else None,"percentile":float(score) if score is not None else None,"base_weight":float(base),"effective_weight":float(effective),"active":active[key],"direction":metric["direction"]}
             availability=min(Decimal("100"),Decimal(minutes)/Decimal(season.availability_target_minutes(as_of.date()))*Decimal("100")); final=performance*Decimal(str(configs["performance_weight"]))+availability*Decimal(str(configs["availability_weight"])) if eligible else None
+            achievement,achievement_breakdown=season_achievement(items[0].player,season,as_of,configs.get("achievements"),prepared_achievements)
+            if final is not None and achievement is not None:
+                weight=Decimal(str(configs["achievements"]["weight"]))
+                final=final*(1-weight)+achievement*weight
             contexts=[x for x in items if x.context_factor is not None]
             summary={"average_opponent_elo":float(sum((x.opponent_elo_before for x in contexts),Decimal("0"))/len(contexts)) if contexts else None,"average_context_factor":float(sum((x.context_factor for x in contexts),Decimal("0"))/len(contexts)) if contexts else None,"domestic_minutes":sum(x.minutes for x in items if x.fixture.competition_season.competition.competition_type==Competition.Type.DOMESTIC_LEAGUE),"ucl_minutes":sum(x.minutes for x in items if x.fixture.competition_season.competition.competition_type==Competition.Type.UCL)}
-            score,_=PlayerSeasonScore.objects.update_or_create(season=season,player_id=pid,formula=formula,as_of=as_of,defaults={"position":position,"eligible":eligible,"minutes":minutes,"appearances":len(items),"performance_score":performance if total_weight else None,"availability_score":availability,"final_score":final,"metric_breakdown":breakdown,"coverage_breakdown":coverage,"context_summary":summary}); output.append(score)
+            if configs.get("achievements"):
+                summary["achievements"]={**achievement_breakdown,"score":str(achievement) if achievement is not None else None}
+            score,_=PlayerSeasonScore.objects.update_or_create(season=season,player_id=pid,formula=formula,as_of=as_of,defaults={"position":position,"eligible":eligible,"minutes":minutes,"appearances":len(items),"performance_score":performance if total_weight else None,"availability_score":availability,"achievement_score":achievement,"achievement_breakdown":achievement_breakdown,"final_score":final,"metric_breakdown":breakdown,"coverage_breakdown":coverage,"context_summary":summary}); output.append(score)
     logger.info("score_calculation_complete season=%s formula=%s players=%s",season.slug,formula.version,len(output)); return output

@@ -3086,6 +3086,18 @@ Keep these as notes only:
 
 # 88. Product statement to preserve during implementation
 
+Tournament/achievement extension (authorized after MVP): see [campaign contribution](campaign_contribution.md).
+
+- MVP extension ✅ Competition format, club/national participants and geographic scope.
+- MVP extension ✅ Edition dates and explicit award-period mapping; summer national tournaments count toward the season just ended.
+- MVP extension ✅ Verified winning campaigns and normalized context-weighted participation, including missed matches and extra time.
+- MVP extension ✅ Immutable policies/evidence, exact stage aliases and separate national-team Elo.
+- MVP extension ✅ Opt-in v1.3 achievement scoring: 5% final weight, 10-point cap, league title 3 points, UCL/major national title 5 points.
+- MVP extension ✅ Persisted snapshot breakdown and player-page campaign credit.
+- MVP extension ✅ Resumable Pro archive command: batches of up to 20 fixtures, live quota/reserve checks, daily 03:00 UTC scheduler, six club and seven national competition types, season priorities and verified-publication gates.
+- MVP extension ✅ Public roadmap completion markers and methodology covering national award periods, separate Elo and trophy participation rules.
+- MVP extension ❌ Production activation and complete verified trophy/campaign data; historical snapshots remain untouched.
+
 The site is not trying to prove that mathematics eliminates every subjective choice in football analysis.
 
 Its value proposition is narrower and stronger:

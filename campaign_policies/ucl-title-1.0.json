@@ -1,0 +1,32 @@
+{
+  "version": "ucl-title-1.0",
+  "config": {
+    "stage_weights": {
+      "group": "1",
+      "playoff": "1.10",
+      "r16": "1.15",
+      "quarter": "1.30",
+      "semi": "1.50",
+      "final": "1.75"
+    },
+    "stage_aliases": {
+      "play-offs": "playoff",
+      "knockout round play-offs": "playoff",
+      "group stage": "group",
+      "league stage": "group",
+      "round of 16": "r16",
+      "quarter-finals": "quarter",
+      "semi-finals": "semi",
+      "final": "final",
+      "league stage - 1": "group",
+      "league stage - 2": "group",
+      "league stage - 3": "group",
+      "league stage - 4": "group",
+      "league stage - 5": "group",
+      "league stage - 6": "group",
+      "league stage - 7": "group",
+      "league stage - 8": "group"
+    },
+    "title_points": "5"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "version": "domestic-title-1.0",
+  "config": {
+    "stage_weights": {
+      "league": "1"
+    },
+    "stage_aliases": {
+      "regular season": "league",
+      "regular season - 1": "league",
+      "regular season - 2": "league",
+      "regular season - 3": "league",
+      "regular season - 4": "league",
+      "regular season - 5": "league",
+      "regular season - 6": "league",
+      "regular season - 7": "league",
+      "regular season - 8": "league",
+      "regular season - 9": "league",
+      "regular season - 10": "league",
+      "regular season - 11": "league",
+      "regular season - 12": "league",
+      "regular season - 13": "league",
+      "regular season - 14": "league",
+      "regular season - 15": "league",
+      "regular season - 16": "league",
+      "regular season - 17": "league",
+      "regular season - 18": "league",
+      "regular season - 19": "league",
+      "regular season - 20": "league",
+      "regular season - 21": "league",
+      "regular season - 22": "league",
+      "regular season - 23": "league",
+      "regular season - 24": "league",
+      "regular season - 25": "league",
+      "regular season - 26": "league",
+      "regular season - 27": "league",
+      "regular season - 28": "league",
+      "regular season - 29": "league",
+      "regular season - 30": "league",
+      "regular season - 31": "league",
+      "regular season - 32": "league",
+      "regular season - 33": "league",
+      "regular season - 34": "league",
+      "regular season - 35": "league",
+      "regular season - 36": "league",
+      "regular season - 37": "league",
+      "regular season - 38": "league"
+    },
+    "title_points": "3"
+  }
+}

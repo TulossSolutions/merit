@@ -1,6 +1,8 @@
 from unittest.mock import Mock, patch
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from pathlib import Path
+import json
 import httpx
 import pytest
 from django.core.management import call_command
@@ -9,6 +11,7 @@ from apps.football.models import Competition, CompetitionSeason, Fixture, Player
 from apps.ingestion.providers.positions import normalize_position
 from apps.ingestion.providers.api_football import ApiFootballProvider
 from apps.ingestion.providers.base import ProviderRequestLimitReached
+from apps.rankings.views import HEADLINES
 
 def test_position_priority_and_unknown():
     assert normalize_position("goalkeeper", "ST", Position.FWD) == Position.GK
@@ -18,6 +21,36 @@ def test_position_priority_and_unknown():
     assert normalize_position("D") == Position.DEF
     assert normalize_position("M") == Position.MID
     assert normalize_position("F") == Position.FWD
+
+@override_settings(API_FOOTBALL_KEY="secret", API_FOOTBALL_BASE_URL="https://example.test")
+def test_position_list_headlines_match_non_null_api_football_metrics():
+    stats = {
+        "goals": {"total": 1, "assists": 1, "conceded": 0, "saves": 3},
+        "shots": {"total": 4, "on": 2},
+        "passes": {"total": 40, "key": 2, "accuracy": "80%"},
+        "tackles": {"total": 3, "interceptions": 2},
+        "duels": {"total": 8, "won": 5},
+        "dribbles": {"attempts": 3, "success": 2},
+        "penalty": {"saved": 1},
+    }
+    normalized = {metric.key: metric for metric in ApiFootballProvider()._metrics(stats)}
+    formulas = []
+    for path in Path("scoring_formulas").glob("*.json"):
+        with path.open(encoding="utf8") as handle:
+            formulas.append(json.load(handle))
+    formula = max(formulas, key=lambda item: tuple(int(part) for part in item["version"].split(".")))
+    derived_sources = {"clean_sheet": "goals_conceded"}
+    for position, headline_keys in HEADLINES.items():
+        definitions = {metric["key"]: metric for metric in formula["positions"][position]["metrics"]}
+        for headline_key in headline_keys:
+            assert headline_key in definitions, f"{position} headline {headline_key!r} is not defined by formula v{formula['version']}"
+            definition = definitions[headline_key]
+            source = derived_sources.get(definition["source"], definition["source"])
+            assert source in normalized, f"{position} headline {headline_key!r} expects unavailable API-Football source {source!r}"
+            assert normalized[source].value is not None, f"{position} headline {headline_key!r} normalized to a missing value"
+            if definition["aggregation"] == "RATE":
+                assert normalized[source].numerator is not None, f"{position} headline {headline_key!r} is missing its rate numerator"
+                assert normalized[source].denominator is not None, f"{position} headline {headline_key!r} is missing its rate denominator"
 
 @override_settings(API_FOOTBALL_KEY="secret", API_FOOTBALL_BASE_URL="https://example.test")
 @patch("apps.ingestion.providers.api_football.time.sleep")

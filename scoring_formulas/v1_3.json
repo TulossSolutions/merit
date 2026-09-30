@@ -1,0 +1,330 @@
+{
+  "version": "1.3",
+  "name": "Tournament-ready achievement model",
+  "coverage_threshold": 0.15,
+  "performance_weight": 0.92,
+  "availability_weight": 0.08,
+  "notes": "Opt-in trophy model: 5% achievements, 10-point cap, domestic titles 3 points and UCL 5, scaled by normalized campaign contribution. Activation requires verified complete outcomes. v1.2 remains the default; past snapshots unchanged.",
+  "positions": {
+    "FWD": {
+      "metrics": [
+        {
+          "key": "goals_per90",
+          "label": "Goals / 90",
+          "source": "goals",
+          "weight": 0.3,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "assists_per90",
+          "label": "Assists / 90",
+          "source": "assists",
+          "weight": 0.16,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "shots_on_target_per90",
+          "label": "Shots on target / 90",
+          "source": "shots_on_target",
+          "weight": 0.12,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "key_passes_per90",
+          "label": "Key passes / 90",
+          "source": "key_passes",
+          "weight": 0.12,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "successful_dribbles_per90",
+          "label": "Successful dribbles / 90",
+          "source": "successful_dribbles",
+          "weight": 0.12,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "duel_win_rate",
+          "label": "Duel win rate",
+          "source": "duels",
+          "weight": 0.08,
+          "aggregation": "RATE",
+          "direction": "positive"
+        },
+        {
+          "key": "goal_conversion_rate",
+          "label": "Goal conversion",
+          "source": "shots",
+          "weight": 0.1,
+          "aggregation": "RATE",
+          "direction": "positive"
+        }
+      ]
+    },
+    "MID": {
+      "metrics": [
+        {
+          "key": "key_passes_per90",
+          "label": "Key passes / 90",
+          "source": "key_passes",
+          "weight": 0.16,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "assists_per90",
+          "label": "Assists / 90",
+          "source": "assists",
+          "weight": 0.1,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "accurate_passes_per90",
+          "label": "Accurate passes / 90",
+          "source": "accurate_passes",
+          "weight": 0.12,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "pass_accuracy",
+          "label": "Pass accuracy",
+          "source": "passes",
+          "weight": 0.08,
+          "aggregation": "RATE",
+          "direction": "positive"
+        },
+        {
+          "key": "interceptions_per90",
+          "label": "Interceptions / 90",
+          "source": "interceptions",
+          "weight": 0.14,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "tackles_per90",
+          "label": "Tackles / 90",
+          "source": "tackles",
+          "weight": 0.12,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "duel_win_rate",
+          "label": "Duel win rate",
+          "source": "duels",
+          "weight": 0.1,
+          "aggregation": "RATE",
+          "direction": "positive"
+        },
+        {
+          "key": "successful_dribbles_per90",
+          "label": "Successful dribbles / 90",
+          "source": "successful_dribbles",
+          "weight": 0.08,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "goals_per90",
+          "label": "Goals / 90",
+          "source": "goals",
+          "weight": 0.1,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        }
+      ]
+    },
+    "DEF": {
+      "metrics": [
+        {
+          "key": "duel_win_rate",
+          "label": "Duel win rate",
+          "source": "duels",
+          "weight": 0.18,
+          "aggregation": "RATE",
+          "direction": "positive"
+        },
+        {
+          "key": "aerial_duel_win_rate",
+          "label": "Aerial duel win rate",
+          "source": "aerial_duels",
+          "weight": 0.14,
+          "aggregation": "RATE",
+          "direction": "positive"
+        },
+        {
+          "key": "interceptions_per90",
+          "label": "Interceptions / 90",
+          "source": "interceptions",
+          "weight": 0.16,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "tackles_per90",
+          "label": "Tackles / 90",
+          "source": "tackles",
+          "weight": 0.16,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "clearances_per90",
+          "label": "Clearances / 90",
+          "source": "clearances",
+          "weight": 0.1,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "recoveries_per90",
+          "label": "Recoveries / 90",
+          "source": "recoveries",
+          "weight": 0.1,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "accurate_passes_per90",
+          "label": "Accurate passes / 90",
+          "source": "accurate_passes",
+          "weight": 0.08,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "pass_accuracy",
+          "label": "Pass accuracy",
+          "source": "passes",
+          "weight": 0.04,
+          "aggregation": "RATE",
+          "direction": "positive"
+        },
+        {
+          "key": "errors_leading_to_goal_per90",
+          "label": "Errors leading to goal / 90",
+          "source": "errors_leading_to_goal",
+          "weight": 0.04,
+          "aggregation": "NEGATIVE_COUNT_PER90",
+          "direction": "negative"
+        }
+      ]
+    },
+    "GK": {
+      "metrics": [
+        {
+          "key": "save_percentage",
+          "label": "Save percentage",
+          "source": "saves",
+          "weight": 0.26,
+          "aggregation": "RATE",
+          "direction": "positive"
+        },
+        {
+          "key": "saves_per90",
+          "label": "Saves / 90",
+          "source": "saves",
+          "weight": 0.2,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "clean_sheet_rate",
+          "label": "Clean-sheet rate",
+          "source": "clean_sheet",
+          "weight": 0.15,
+          "aggregation": "DERIVED_RATE",
+          "direction": "positive"
+        },
+        {
+          "key": "goals_conceded_per90",
+          "label": "Goals conceded / 90",
+          "source": "goals_conceded",
+          "weight": 0.14,
+          "aggregation": "NEGATIVE_COUNT_PER90",
+          "direction": "negative"
+        },
+        {
+          "key": "penalties_saved_per90",
+          "label": "Penalties saved / 90",
+          "source": "penalties_saved",
+          "weight": 0.1,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "long_pass_accuracy",
+          "label": "Long-pass accuracy",
+          "source": "long_passes",
+          "weight": 0.07,
+          "aggregation": "RATE",
+          "direction": "positive"
+        },
+        {
+          "key": "accurate_long_passes_per90",
+          "label": "Accurate long passes / 90",
+          "source": "accurate_long_passes",
+          "weight": 0.04,
+          "aggregation": "COUNT_PER90",
+          "direction": "positive",
+          "context_adjust": true
+        },
+        {
+          "key": "errors_leading_to_goal_per90",
+          "label": "Errors leading to goal / 90",
+          "source": "errors_leading_to_goal",
+          "weight": 0.04,
+          "aggregation": "NEGATIVE_COUNT_PER90",
+          "direction": "negative"
+        }
+      ]
+    }
+  },
+  "achievements": {
+    "enabled": true,
+    "weight": 0.05,
+    "points_cap": 10,
+    "policy_versions": {
+      "api_football:39": "domestic-title-2.0",
+      "api_football:140": "domestic-title-2.0",
+      "api_football:135": "domestic-title-2.0",
+      "api_football:78": "domestic-title-2.0",
+      "api_football:61": "domestic-title-2.0",
+      "api_football:2": "ucl-title-2.0",
+      "api_football:1": "national-major-title-2.0",
+      "api_football:4": "national-major-title-2.0",
+      "api_football:9": "national-major-title-2.0",
+      "api_football:6": "national-major-title-2.0",
+      "api_football:7": "national-major-title-2.0",
+      "api_football:22": "national-major-title-2.0",
+      "api_football:5": "national-major-title-2.0"
+    }
+  }
+}
