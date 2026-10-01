@@ -1,8 +1,10 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from io import StringIO
+import json
 
 import pytest
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.test import override_settings
@@ -14,7 +16,8 @@ from apps.ingestion.providers.api_football import ApiFootballProvider
 from apps.ingestion.services.outcomes import (retain_fixture_review, retain_outcome_review,
     reviewed_fixture_bundle, reviewed_outcome, winner_fixture_ids)
 from apps.ingestion.services.participation import (derive_participation, participation_evidence,
-    payload_checksum, retain_participation)
+    payload_checksum, retain_participation, retain_reviewed_participation,
+    validate_reviewed_participation)
 from apps.ingestion.services.sync import ingest_fixture_bundle
 from apps.scoring.services.campaigns import campaign_contribution
 
@@ -95,6 +98,70 @@ def test_participation_revalidates_source_and_rejects_ambiguous_evidence():
     row["lineups"].append(row["lineups"][0])
     with pytest.raises(ValidationError, match="unique winning-team lineup"):
         derive_participation(row, "13", 90)
+
+
+def reviewed_source(players=None):
+    players = players or [{"provider_id": str(value), "name": f"Player {value}",
+        "minutes": 90, "started": True} for value in range(100, 111)]
+    return {"players": players, "reviewer": "reviewer",
+        "source_urls": ["https://official.example/match", "https://archive.example/match"],
+        "retrieved_at": "2026-10-01", "red_cards": 0,
+        "normalization": {"minute_source": "rsssf", "stoppage_time": "clamped_to_match_duration",
+            "notes": "No source discrepancy."}}
+
+
+def test_reviewed_external_participation_is_auditable_and_not_performance_data():
+    season, edition, policy, winner, opponent = setup_edition()
+    player = Player.objects.create(provider="api_football", provider_id="100", name="Player 100", slug="p100")
+    PlayerTeamSeason.objects.create(player=player, team=winner, season=season, competition_season=edition)
+    fixture = Fixture.objects.create(provider="api_football", provider_id="1", competition_season=edition,
+        home_team=winner, away_team=opponent, starts_at=datetime(2018, 5, 26, 19, tzinfo=timezone.utc),
+        status="FINISHED", stage_name="Final", home_score=1, away_score=0, available_minutes=90)
+    evidence = retain_reviewed_participation(fixture, winner, reviewed_source())
+    campaign = WinningCampaign.objects.create(edition=edition, winner=winner, policy=policy,
+        awarded_at=datetime(2018, 5, 26, 22, tzinfo=timezone.utc), verified_at=datetime.now(timezone.utc),
+        evidence="verified", expected_matches=1, is_complete=True)
+    result = campaign_contribution(campaign, player, campaign.awarded_at)
+    assert result["contribution"] == Decimal("1")
+    assert result["breakdown"]["matches"][0]["participation_evidence"]["record"] == evidence.pk
+    source = RawProviderPayload.objects.get(pk=evidence.payload["source_payload"])
+    assert source.resource_type == "trophy_participation_review"
+    assert fixture.playerfixture_set.count() == 0 and fixture.stats_ingested_at is None
+
+
+def test_reviewed_external_participation_rejects_invalid_team_minutes_and_source_tampering():
+    _, edition, _, winner, opponent = setup_edition()
+    fixture = Fixture.objects.create(provider="api_football", provider_id="1", competition_season=edition,
+        home_team=winner, away_team=opponent, starts_at=datetime(2018, 5, 26, 19, tzinfo=timezone.utc),
+        status="FINISHED", stage_name="Final", available_minutes=90)
+    review = reviewed_source()
+    review["players"][0]["minutes"] = 89
+    with pytest.raises(ValidationError, match="team-minute total"):
+        retain_reviewed_participation(fixture, winner, review)
+    evidence = retain_reviewed_participation(fixture, winner, reviewed_source())
+    RawProviderPayload.objects.filter(pk=evidence.payload["source_payload"]).update(payload={"fixture": "changed"})
+    with pytest.raises(ValidationError, match="checksum mismatch"):
+        participation_evidence([fixture], winner)
+
+
+def test_versioned_algeria_team_sheets_reconcile_to_six_complete_matches():
+    _, edition, _, winner, opponent = setup_edition("6:2019")
+    winner.provider_id = "1532"
+    winner.save(update_fields=["provider_id"])
+    config = json.loads((settings.BASE_DIR / "trophy_reviews" / "v1.json").read_text(encoding="utf8"))
+    reviews = [item for item in config["participation"] if "reviewed_source" in item]
+    assert {item["fixture"] for item in reviews} == {
+        "117955", "117966", "117994", "118018", "118049", "118060"}
+    for item in reviews:
+        fixture = Fixture.objects.create(provider="api_football", provider_id=item["fixture"],
+            competition_season=edition, home_team=winner, away_team=opponent,
+            starts_at=datetime(2018, 1, 1, 19, tzinfo=timezone.utc), status="FINISHED",
+            stage_name="Qualification", available_minutes=90)
+        source = {"fixture": item["fixture"], "team": item["team"], "duration": 90,
+            **item["reviewed_source"]}
+        players = validate_reviewed_participation(fixture, winner, source)
+        assert sum(row["minutes"] for row in players) == 990
+        assert sum(row["started"] for row in players) == 11
 
 
 @override_settings(API_FOOTBALL_KEY="test")

@@ -68,6 +68,209 @@
     {"fixture": "132516", "team": "27", "corroboration": null},
     {"fixture": "132527", "team": "27", "corroboration": null},
     {"fixture": "132531", "team": "27", "corroboration": null},
-    {"fixture": "1508003", "team": "13", "source_resource": "trophy_fixture_source", "corroboration": {"reviewer": "Merit project owner (approved 2026-10-01)", "source_url": "https://www.cafonline.com/afcon2025/news/gueye-extra-time-stunner-hands-senegal-totalenergies-caf-afcon-2025-title/", "red_cards": 0}}
+    {"fixture": "1508003", "team": "13", "source_resource": "trophy_fixture_source", "corroboration": {"reviewer": "Merit project owner (approved 2026-10-01)", "source_url": "https://www.cafonline.com/afcon2025/news/gueye-extra-time-stunner-hands-senegal-totalenergies-caf-afcon-2025-title/", "red_cards": 0}},
+    {
+      "fixture": "117955",
+      "team": "1532",
+      "reviewed_source": {
+        "players": [
+          {"provider_id": "44557", "name": "Raïs M'Bolhi", "minutes": 90, "started": true},
+          {"provider_id": "2194", "name": "Ramy Bensebaini", "minutes": 90, "started": true},
+          {"provider_id": "316", "name": "Faouzi Ghoulam", "minutes": 90, "started": true},
+          {"provider_id": "1567", "name": "Aïssa Mandi", "minutes": 90, "started": true},
+          {"provider_id": "3165", "name": "Youcef Atal", "minutes": 45, "started": true},
+          {"provider_id": "409", "name": "Nabil Bentaleb", "minutes": 90, "started": true},
+          {"provider_id": "388", "name": "Yacine Brahimi", "minutes": 69, "started": true},
+          {"provider_id": "1783", "name": "Sofiane Hanni", "minutes": 90, "started": true},
+          {"provider_id": "635", "name": "Riyad Mahrez", "minutes": 90, "started": true},
+          {"provider_id": "19301", "name": "Adlène Guédioura", "minutes": 90, "started": true},
+          {"provider_id": "1374", "name": "Islam Slimani", "minutes": 90, "started": true},
+          {"provider_id": "447", "name": "Sofiane Feghouli", "minutes": 36, "started": false},
+          {"provider_id": "3170", "name": "Carl Medjani", "minutes": 9, "started": false},
+          {"provider_id": "3179", "name": "El Arbi Hillel Soudani", "minutes": 21, "started": false}
+        ],
+        "reviewer": "Merit data review 2026-10-01",
+        "source_urls": [
+          "https://www.rsssf.org/tables/2019a-qdet.html",
+          "https://www.national-football-teams.com/matches/report/17685/Algeria_Togo.html"
+        ],
+        "retrieved_at": "2026-10-01",
+        "red_cards": 0,
+        "normalization": {
+          "minute_source": "rsssf",
+          "stoppage_time": "clamped_to_match_duration",
+          "notes": "RSSSF minutes corroborated by National Football Teams."
+        }
+      }
+    },
+    {
+      "fixture": "117966",
+      "team": "1532",
+      "reviewed_source": {
+        "players": [
+          {"provider_id": "44557", "name": "Raïs M'Bolhi", "minutes": 90, "started": true},
+          {"provider_id": "1567", "name": "Aïssa Mandi", "minutes": 90, "started": true},
+          {"provider_id": "20658", "name": "Mehdi Tahrat", "minutes": 90, "started": true},
+          {"provider_id": "2194", "name": "Ramy Bensebaini", "minutes": 90, "started": true},
+          {"provider_id": "388", "name": "Yacine Brahimi", "minutes": 90, "started": true},
+          {"provider_id": "50795", "name": "Saphir Taïder", "minutes": 90, "started": true},
+          {"provider_id": "409", "name": "Nabil Bentaleb", "minutes": 90, "started": true},
+          {"provider_id": "635", "name": "Riyad Mahrez", "minutes": 90, "started": true},
+          {"provider_id": "18780", "name": "Rachid Ghezzal", "minutes": 72, "started": true},
+          {"provider_id": "30859", "name": "Mohamed Fares", "minutes": 90, "started": true},
+          {"provider_id": "3176", "name": "Baghdad Bounedjah", "minutes": 71, "started": true},
+          {"provider_id": "447", "name": "Sofiane Feghouli", "minutes": 18, "started": false},
+          {"provider_id": "1374", "name": "Islam Slimani", "minutes": 19, "started": false}
+        ],
+        "reviewer": "Merit data review 2026-10-01",
+        "source_urls": [
+          "https://www.rsssf.org/tables/2019a-qdet.html",
+          "https://www.national-football-teams.com/matches/report/20595/Gambia_Algeria.html"
+        ],
+        "retrieved_at": "2026-10-01",
+        "red_cards": 0,
+        "normalization": {
+          "minute_source": "rsssf",
+          "stoppage_time": "clamped_to_match_duration",
+          "notes": "RSSSF minutes corroborated by National Football Teams."
+        }
+      }
+    },
+    {
+      "fixture": "117994",
+      "team": "1532",
+      "reviewed_source": {
+        "players": [
+          {"provider_id": "44557", "name": "Raïs M'Bolhi", "minutes": 90, "started": true},
+          {"provider_id": "20658", "name": "Mehdi Tahrat", "minutes": 90, "started": true},
+          {"provider_id": "2194", "name": "Ramy Bensebaini", "minutes": 90, "started": true},
+          {"provider_id": "388", "name": "Yacine Brahimi", "minutes": 77, "started": true},
+          {"provider_id": "50795", "name": "Saphir Taïder", "minutes": 90, "started": true},
+          {"provider_id": "409", "name": "Nabil Bentaleb", "minutes": 90, "started": true},
+          {"provider_id": "635", "name": "Riyad Mahrez", "minutes": 80, "started": true},
+          {"provider_id": "3165", "name": "Youcef Atal", "minutes": 90, "started": true},
+          {"provider_id": "30859", "name": "Mohamed Fares", "minutes": 90, "started": true},
+          {"provider_id": "3176", "name": "Baghdad Bounedjah", "minutes": 90, "started": true},
+          {"provider_id": "1371", "name": "Yassine Benzia", "minutes": 72, "started": true},
+          {"provider_id": "18780", "name": "Rachid Ghezzal", "minutes": 13, "started": false},
+          {"provider_id": "724", "name": "Ishak Belfodil", "minutes": 10, "started": false},
+          {"provider_id": "447", "name": "Sofiane Feghouli", "minutes": 18, "started": false}
+        ],
+        "reviewer": "Merit data review 2026-10-01",
+        "source_urls": [
+          "https://lfp.dz/ar/article/828",
+          "https://www.rsssf.org/tables/2019a-qdet.html"
+        ],
+        "retrieved_at": "2026-10-01",
+        "red_cards": 0,
+        "normalization": {
+          "minute_source": "lfp_official",
+          "stoppage_time": "clamped_to_match_duration",
+          "notes": "Official LFP substitution minutes take precedence over one-minute event-convention differences in RSSSF."
+        }
+      }
+    },
+    {
+      "fixture": "118018",
+      "team": "1532",
+      "reviewed_source": {
+        "players": [
+          {"provider_id": "44557", "name": "Raïs M'Bolhi", "minutes": 90, "started": true},
+          {"provider_id": "1567", "name": "Aïssa Mandi", "minutes": 90, "started": true},
+          {"provider_id": "20658", "name": "Mehdi Tahrat", "minutes": 90, "started": true},
+          {"provider_id": "2194", "name": "Ramy Bensebaini", "minutes": 90, "started": true},
+          {"provider_id": "19301", "name": "Adlène Guédioura", "minutes": 90, "started": true},
+          {"provider_id": "447", "name": "Sofiane Feghouli", "minutes": 90, "started": true},
+          {"provider_id": "388", "name": "Yacine Brahimi", "minutes": 90, "started": true},
+          {"provider_id": "409", "name": "Nabil Bentaleb", "minutes": 61, "started": true},
+          {"provider_id": "18780", "name": "Rachid Ghezzal", "minutes": 46, "started": true},
+          {"provider_id": "30859", "name": "Mohamed Fares", "minutes": 90, "started": true},
+          {"provider_id": "724", "name": "Ishak Belfodil", "minutes": 73, "started": true},
+          {"provider_id": "635", "name": "Riyad Mahrez", "minutes": 29, "started": false},
+          {"provider_id": "3176", "name": "Baghdad Bounedjah", "minutes": 44, "started": false},
+          {"provider_id": "327", "name": "Adam Ounas", "minutes": 17, "started": false}
+        ],
+        "reviewer": "Merit data review 2026-10-01",
+        "source_urls": [
+          "https://lfp.dz/en/article/838",
+          "https://www.rsssf.org/tables/2019a-qdet.html"
+        ],
+        "retrieved_at": "2026-10-01",
+        "red_cards": 0,
+        "normalization": {
+          "minute_source": "lfp_official",
+          "stoppage_time": "clamped_to_match_duration",
+          "notes": "Official LFP substitution minutes take precedence over one-minute event-convention differences in RSSSF."
+        }
+      }
+    },
+    {
+      "fixture": "118049",
+      "team": "1532",
+      "reviewed_source": {
+        "players": [
+          {"provider_id": "44557", "name": "Raïs M'Bolhi", "minutes": 90, "started": true},
+          {"provider_id": "20658", "name": "Mehdi Tahrat", "minutes": 90, "started": true},
+          {"provider_id": "2194", "name": "Ramy Bensebaini", "minutes": 46, "started": true},
+          {"provider_id": "44363", "name": "Djamel Benlamri", "minutes": 90, "started": true},
+          {"provider_id": "447", "name": "Sofiane Feghouli", "minutes": 90, "started": true},
+          {"provider_id": "635", "name": "Riyad Mahrez", "minutes": 90, "started": true},
+          {"provider_id": "3165", "name": "Youcef Atal", "minutes": 90, "started": true},
+          {"provider_id": "4379", "name": "Oussama Chita", "minutes": 90, "started": true},
+          {"provider_id": "3176", "name": "Baghdad Bounedjah", "minutes": 90, "started": true},
+          {"provider_id": "49416", "name": "Youcef Belaïli", "minutes": 81, "started": true},
+          {"provider_id": "1371", "name": "Yassine Benzia", "minutes": 69, "started": true},
+          {"provider_id": "48505", "name": "Ayoub Abdellaoui", "minutes": 44, "started": false},
+          {"provider_id": "327", "name": "Adam Ounas", "minutes": 9, "started": false},
+          {"provider_id": "50795", "name": "Saphir Taïder", "minutes": 21, "started": false}
+        ],
+        "reviewer": "Merit data review 2026-10-01",
+        "source_urls": [
+          "https://lfp.dz/fr/article/912",
+          "https://www.rsssf.org/tables/2019a-qdet.html"
+        ],
+        "retrieved_at": "2026-10-01",
+        "red_cards": 0,
+        "normalization": {
+          "minute_source": "lfp_official",
+          "stoppage_time": "clamped_to_match_duration",
+          "notes": "Official LFP substitution minutes take precedence over one-minute event-convention differences in RSSSF."
+        }
+      }
+    },
+    {
+      "fixture": "118060",
+      "team": "1532",
+      "reviewed_source": {
+        "players": [
+          {"provider_id": "44527", "name": "Azzedine Doukha", "minutes": 90, "started": true},
+          {"provider_id": "3169", "name": "Rafik Halliche", "minutes": 90, "started": true},
+          {"provider_id": "48505", "name": "Ayoub Abdellaoui", "minutes": 90, "started": true},
+          {"provider_id": "21704", "name": "Mehdi Abeid", "minutes": 90, "started": true},
+          {"provider_id": "3173", "name": "Ismaël Bennacer", "minutes": 90, "started": true},
+          {"provider_id": "30859", "name": "Mohamed Fares", "minutes": 90, "started": true},
+          {"provider_id": "327", "name": "Adam Ounas", "minutes": 90, "started": true},
+          {"provider_id": "4399", "name": "Hicham Boudaoui", "minutes": 69, "started": true},
+          {"provider_id": "4406", "name": "Haithem Loucif", "minutes": 90, "started": true},
+          {"provider_id": "49416", "name": "Youcef Belaïli", "minutes": 90, "started": true},
+          {"provider_id": "37131", "name": "Oussama Darfalou", "minutes": 64, "started": true},
+          {"provider_id": "3172", "name": "Mohamed Benkhemassa", "minutes": 21, "started": false},
+          {"provider_id": "42444", "name": "Ilias Hassani", "minutes": 0, "started": false},
+          {"provider_id": "4412", "name": "Zakaria Naidji", "minutes": 26, "started": false}
+        ],
+        "reviewer": "Merit data review 2026-10-01",
+        "source_urls": [
+          "https://www.rsssf.org/tables/2019a-qdet.html",
+          "https://www.national-football-teams.com/matches/report/22554/Algeria_Gambia.html"
+        ],
+        "retrieved_at": "2026-10-01",
+        "red_cards": 0,
+        "normalization": {
+          "minute_source": "rsssf",
+          "stoppage_time": "clamped_to_match_duration",
+          "notes": "RSSSF minutes corroborated by National Football Teams; the 92nd-minute substitution is clamped to 90."
+        }
+      }
+    }
   ]
 }

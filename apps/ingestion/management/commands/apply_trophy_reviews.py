@@ -14,7 +14,8 @@ from apps.ingestion.models import RawProviderPayload
 from apps.ingestion.providers import get_provider
 from apps.ingestion.services.outcomes import (retain_fixture_review, retain_outcome_review,
     review_reference, reviewed_fixture_bundle, winner_fixture_ids)
-from apps.ingestion.services.participation import payload_checksums, retain_participation
+from apps.ingestion.services.participation import (payload_checksums, retain_participation,
+    retain_reviewed_participation)
 from apps.ingestion.services.sync import ingest_fixture_bundle
 from apps.scoring.services.campaigns import prepare_campaign_data
 
@@ -112,6 +113,12 @@ class Command(BaseCommand):
                         fixture = Fixture.objects.select_related("competition_season", "home_team", "away_team").get(
                             provider=provider.provider_name, provider_id=item["fixture"])
                         team = Team.objects.get(provider=provider.provider_name, provider_id=item["team"])
+                        if "reviewed_source" in item:
+                            if set(item) != {"fixture", "team", "reviewed_source"}:
+                                raise ValidationError("Reviewed participation item has unsupported fields")
+                            retain_reviewed_participation(fixture, team, item["reviewed_source"])
+                            touched.add(fixture.competition_season_id)
+                            continue
                         source = RawProviderPayload.objects.filter(provider=provider.provider_name,
                             resource_type=item.get("source_resource", "fixture"),
                             provider_resource_id=item["fixture"]).order_by("-pk").first()
