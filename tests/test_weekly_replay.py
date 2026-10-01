@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+import json
 from unittest.mock import Mock, patch
 
 import pytest
@@ -121,9 +122,50 @@ def test_plan_is_fixed_across_restarts_and_all_12_years_include_actual_fixture_b
             for value in (datetime(year,7,10,tzinfo=timezone.utc),min(NOW,datetime(year+1,7,6,tzinfo=timezone.utc)))]
         job=WeeklyReplay(now=NOW); job.plan(config)
     assert len(job.progress["periods"])==12 and list(job.progress["periods"])[:2]==["2024-25","2026-27"]
+    assert job.progress["period_order"]==["2024-25","2026-27","2025-26","2023-24","2022-23","2021-22",
+        "2020-21","2019-20","2018-19","2017-18","2016-17","2015-16"]
     assert job.progress["periods"]["2023-24"]["terminal"].startswith("2024-07-06")
     again=WeeklyReplay(now=NOW+timedelta(days=7)); again.plan(config)
     assert again.progress["periods"]==job.progress["periods"]
+    assert again.progress["period_order"]==job.progress["period_order"]
+
+
+@pytest.mark.parametrize("legacy",[True,False])
+def test_replay_resumes_in_explicit_priority_order_despite_reordered_json_keys(legacy):
+    archive_gate_data(); config=formula("1.5")
+    expected=["2024-25","2026-27","2025-26","2023-24","2022-23","2021-22","2020-21","2019-20",
+        "2018-19","2017-18","2016-17","2015-16"]
+    cutoff=datetime(2026,8,17,6,tzinfo=timezone.utc).isoformat()
+    periods={slug:{"season_id":ensure_award_period(int(slug[:4])).pk,"first_fixture":"retained-boundary",
+        "terminal":cutoff,"weeks":[{"cutoff":cutoff,"kind":"weekly"}]} for slug in expected}
+    # Existing completed weeks must stay intact when migrating a legacy checkpoint.
+    periods["2015-16"]["weeks"][0].update(status="existing",snapshot=99)
+    metadata={"formula":"1.5","formula_checksum":config.checksum_sha256,"captured_at":NOW.isoformat(),
+        "cadence":"Monday 06:00 UTC","periods":periods}
+    if not legacy: metadata["period_order"]=expected
+    # JSONB object keys are unordered; arrays must carry the processing order.
+    reordered=json.loads(json.dumps(metadata,sort_keys=True))
+    assert list(reordered["periods"])!=expected
+    state=ProviderSyncState.objects.create(provider="api_football",sync_key=SYNC_KEY,metadata=reordered)
+    job=WeeklyReplay(now=NOW,max_weeks=1,report=Mock())
+    job.plan(config); state.refresh_from_db()
+    assert state.metadata["periods"]==reordered["periods"]
+    assert state.metadata["formula_checksum"]==metadata["formula_checksum"]
+    assert state.metadata["captured_at"]==metadata["captured_at"]
+    assert state.metadata["period_order"]==expected
+    original_order=list(state.metadata["period_order"])
+    with patch("apps.rankings.services.weekly_replay.recompute_scores",return_value=[]) as calculate:
+        first=job.run()
+        assert calculate.call_count==1 and calculate.call_args.args[0].slug=="2024-25"
+        assert first["status"]=="checkpointed"
+        # Simulate another JSONB round trip after the first batch checkpoint.
+        state.refresh_from_db(); state.metadata=json.loads(json.dumps(state.metadata,sort_keys=True)); state.save()
+        calculate.reset_mock()
+        second=WeeklyReplay(now=NOW,report=Mock(),max_weeks=1).run()
+        assert calculate.call_count==1 and calculate.call_args.args[0].slug=="2026-27"
+        assert second["period_order"]==original_order
+    assert second["periods"]["2015-16"]==reordered["periods"]["2015-16"]
+    assert not RankingSnapshot.objects.exists() and not PlayerSeasonScore.objects.exists()
 
 
 def test_weekly_replay_publishes_cumulative_real_scores_preserves_terminal_and_resumes_without_api():

@@ -82,14 +82,19 @@ class WeeklyReplay:
         self.state.save(update_fields=["metadata","last_attempt_at","last_success_at","last_error","updated_at"])
 
     def plan(self, formula):
+        order=[period_slug(year) for year in dict.fromkeys([2024,LAST_YEAR,*range(LAST_YEAR-1,FIRST_YEAR-1,-1)])]
         if self.progress.get("periods"):
             if self.progress["formula_checksum"]!=formula.checksum_sha256:
                 raise ValidationError("Replay formula changed; the saved series must not silently change rules.")
+            if "period_order" not in self.progress:
+                # Legacy JSONB checkpoints preserve data, but not object-key order.
+                self.progress["period_order"]=[slug for slug in order if slug in self.progress["periods"]]
+                self.checkpoint()
             return
         periods={}
         # Retain the archive priority: 2024/25, current season, then newer to older.
-        for year in dict.fromkeys([2024,LAST_YEAR,*range(LAST_YEAR-1,FIRST_YEAR-1,-1)]):
-            season=Season.objects.get(slug=period_slug(year))
+        for slug in order:
+            season=Season.objects.get(slug=slug)
             fixtures=fixtures_for_award_period(season).filter(status=Fixture.Status.FINISHED,starts_at__lte=self.now)
             first=fixtures.order_by("starts_at").values_list("starts_at",flat=True).first()
             last=fixtures.order_by("-starts_at").values_list("starts_at",flat=True).first()
@@ -99,7 +104,7 @@ class WeeklyReplay:
             if old is not None: terminal=max(terminal,old)
             periods[season.slug]={"season_id":season.pk,"first_fixture":first.isoformat(),"terminal":terminal.isoformat(),
                 "weeks":weekly_cutoffs(first,terminal)}
-        self.progress.update(periods=periods,formula=formula.version,formula_checksum=formula.checksum_sha256,
+        self.progress.update(periods=periods,period_order=list(periods),formula=formula.version,formula_checksum=formula.checksum_sha256,
             captured_at=self.now.isoformat(),cadence="Monday 06:00 UTC",first_year=FIRST_YEAR,last_year=LAST_YEAR)
         self.checkpoint(status="planned")
 
@@ -123,7 +128,8 @@ class WeeklyReplay:
                 raise ValidationError("Replay formula checksum does not match its immutable rules.")
             self.plan(formula); attempted=0
             self.checkpoint(status="running",reason="")
-            for slug,period in self.progress["periods"].items():
+            for slug in self.progress["period_order"]:
+                period=self.progress["periods"][slug]
                 season=Season.objects.get(pk=period["season_id"])
                 weeks=[week for week in period["weeks"] if week.get("status") not in ("published","existing","no_eligible_players")]
                 if not weeks: continue

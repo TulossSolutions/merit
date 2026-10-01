@@ -2,6 +2,7 @@ from datetime import date,datetime,timezone
 from unittest.mock import Mock,patch
 from decimal import Decimal
 import pytest
+from freezegun import freeze_time
 from django.core.exceptions import ValidationError
 from django.test import override_settings
 
@@ -119,6 +120,7 @@ class FakeArchiveProvider(ApiFootballProvider):
 
 
 @override_settings(API_FOOTBALL_KEY="test")
+@freeze_time("2026-09-30")
 @patch("apps.ingestion.providers.api_football.time.sleep")
 def test_archive_preparation_is_resumable_cached_and_does_not_publish(_):
     now=datetime(2026,9,30,tzinfo=timezone.utc)
