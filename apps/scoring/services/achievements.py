@@ -1,9 +1,8 @@
 from decimal import Decimal, InvalidOperation
-from collections import defaultdict
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from apps.football.models import Competition,Fixture,PlayerFixture,PlayerTeamSeason,WinningCampaign
-from .campaigns import campaign_contribution, record_campaign_contribution
+from apps.football.models import Competition,WinningCampaign
+from .campaigns import campaign_contribution, record_campaign_contribution, prepare_campaign_data
 
 
 def validate_achievement_config(config):
@@ -30,26 +29,30 @@ def prepare_season_achievements(season,as_of,config):
     if not config or not config["enabled"]: return []
     campaigns=WinningCampaign.objects.filter(edition__season=season,awarded_at__lte=as_of).select_related("edition__competition","policy","winner")
     prepared=[]
+    errors=[]
     for campaign in campaigns:
         competition=campaign.edition.competition
         key=f"{competition.provider}:{competition.provider_id}"
         version=config["policy_versions"].get(key)
         if version is None: continue
-        if campaign.policy.version!=version: raise ValidationError(f"Campaign policy mismatch for {key}.")
+        data=prepare_campaign_data(campaign)
+        if campaign.policy.version!=version:
+            errors.append(f"Campaign policy mismatch for {key}."); continue
         if not campaign.verified_at or not campaign.evidence.strip() or not campaign.is_complete:
-            raise ValidationError(f"Competition outcome or campaign is unverified: {key}")
+            missing = [fixture.provider_id for fixture in data["fixtures"] if (
+                fixture.status != "FINISHED" or not fixture.available_minutes
+                or fixture.pk not in data["has_players"]
+                or (not fixture.stats_ingested_at and fixture.pk not in data["participation_evidence"]))]
+            errors.append(f"Competition outcome or campaign is unverified: {key} ({competition.name}; fixtures: {', '.join(missing) or 'outcome verification'})")
+            continue
         campaign.full_clean()
-        fixtures=list(Fixture.objects.filter(competition_season=campaign.edition).filter(Q(home_team=campaign.winner)|Q(away_team=campaign.winner)).exclude(status="CANCELLED").order_by("starts_at","pk"))
-        rows=defaultdict(dict)
-        for row in PlayerFixture.objects.filter(fixture__in=fixtures,team=campaign.winner).select_related("player"):
-            rows[row.player_id][row.fixture_id]=row
-        data={"fixtures":fixtures,"rows":rows,"members":set(PlayerTeamSeason.objects.filter(competition_season=campaign.edition,team=campaign.winner).values_list("player_id",flat=True)),
-            "has_players":{row.fixture_id for items in rows.values() for row in items.values()}}
         # Even non-winners must not get scores against an incompletely verified campaign.
-        representative=next((row.player for items in rows.values() for row in items.values()),None)
-        if representative is None: raise ValidationError("Incomplete achievement evidence: campaign_player_data_missing")
+        representative=next(iter(data["players"].values()),None)
+        if representative is None:
+            errors.append(f"Incomplete achievement evidence: campaign_player_data_missing ({key})"); continue
         evidence=campaign_contribution(campaign,representative,as_of,data)
-        if evidence["reason"]: raise ValidationError(f"Incomplete achievement evidence: {evidence['reason']}")
+        if evidence["reason"]:
+            errors.append(f"Incomplete achievement evidence: {evidence['reason']} ({key})"); continue
         if "title_points" not in campaign.policy.config: raise ValidationError(f"Title points are not configured for {key}.")
         prepared.append((campaign,data))
     for key in config["policy_versions"]:
@@ -59,9 +62,10 @@ def prepare_season_achievements(season,as_of,config):
         if not editions.exists():
             if Competition.objects.filter(provider=provider,provider_id=provider_id,participant_type="NATIONAL",is_tracked=True).exists():
                 continue  # Nonannual tournaments do not award a title in every period.
-            raise ValidationError(f"Missing configured competition edition: {key}")
+            errors.append(f"Missing configured competition edition: {key}"); continue
         if editions.filter(Q(ends_on__isnull=True)|Q(ends_on__lte=as_of.date()),winning_campaign__isnull=True).exists():
-            raise ValidationError(f"Missing competition outcome: {key}")
+            errors.append(f"Missing competition outcome: {key}")
+    if errors: raise ValidationError(errors)
     return prepared
 
 
@@ -71,7 +75,7 @@ def season_achievement(player,season,as_of,config,prepared=None):
     prepared=prepare_season_achievements(season,as_of,config) if prepared is None else prepared
     points=Decimal("0"); details=[]
     for campaign,data in prepared:
-        if player.pk not in data["rows"] and player.pk not in data["members"]: continue
+        if player.pk not in data["players"] and player.pk not in data["members"]: continue
         record=record_campaign_contribution(campaign,player,as_of,data)
         if record.contribution is None: raise ValidationError(f"Incomplete achievement evidence: {record.reason}")
         competition=campaign.edition.competition

@@ -1,13 +1,52 @@
 """Auditable campaign participation, independent of the performance formula."""
 import hashlib
 import json
+from collections import defaultdict
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.football.models import Fixture, PlayerCampaignContribution, PlayerFixture, PlayerTeamSeason
+from apps.football.models import Fixture, Player, PlayerCampaignContribution, PlayerFixture, PlayerTeamSeason
+from apps.ingestion.services.participation import participation_evidence
+
+
+def prepare_campaign_data(campaign):
+    fixtures = list(Fixture.objects.filter(competition_season=campaign.edition).filter(
+        Q(home_team=campaign.winner) | Q(away_team=campaign.winner)).exclude(
+        status=Fixture.Status.CANCELLED).order_by("starts_at", "pk"))
+    rows = defaultdict(dict)
+    players = {}
+    minutes = defaultdict(dict)
+    for row in PlayerFixture.objects.filter(fixture__in=fixtures, team=campaign.winner).select_related("player", "fixture"):
+        rows[row.player_id][row.fixture_id] = row
+        players[row.player_id] = row.player
+        if row.fixture.stats_ingested_at:
+            minutes[row.fixture_id][row.player_id] = row.minutes
+    evidence = participation_evidence(fixtures, campaign.winner)
+    if evidence:
+        from apps.ingestion.services.reviews import resolve_provider_aliases
+        identities = {row["provider_id"] for item in evidence.values() for row in item["players"]}
+        known = {p.provider_id: p for p in Player.objects.filter(provider=campaign.winner.provider, provider_id__in=identities)}
+        known.update(resolve_provider_aliases(campaign.winner.provider, identities))
+        for fixture_id, item in evidence.items():
+            canonical = set()
+            for row in item["players"]:
+                player = known.get(row["provider_id"])
+                if player is None:
+                    continue  # Evidence remains usable when this player is imported later.
+                if player.pk in canonical:
+                    raise ValidationError("Duplicate canonical player in campaign participation evidence")
+                canonical.add(player.pk)
+                players[player.pk] = player
+                minutes[fixture_id][player.pk] = row["minutes"]
+    members = set(PlayerTeamSeason.objects.filter(competition_season=campaign.edition,
+        team=campaign.winner).values_list("player_id", flat=True))
+    members.update(players)
+    return {"fixtures": fixtures, "rows": rows, "members": members, "players": players,
+            "minutes": minutes, "participation_evidence": evidence,
+            "has_players": {fid for fid, values in minutes.items() if values} | set(evidence)}
 
 
 def validate_campaign_policy(config):
@@ -63,18 +102,18 @@ def campaign_contribution(campaign,player,as_of,prepared=None):
     if campaign.awarded_at>as_of: return result(reason="title_not_yet_awarded")
     if not campaign.verified_at or not campaign.evidence.strip(): return result(reason="winner_unverified")
     if not campaign.is_complete: return result(reason="campaign_incomplete")
-    fixtures=prepared["fixtures"] if prepared is not None else list(Fixture.objects.filter(competition_season=campaign.edition).filter(
-        Q(home_team=campaign.winner)|Q(away_team=campaign.winner)).exclude(
-        status=Fixture.Status.CANCELLED).order_by("starts_at","pk"))
+    prepared = prepared if prepared is not None else prepare_campaign_data(campaign)
+    fixtures=prepared["fixtures"]
     if len(fixtures)!=campaign.expected_matches: return result(reason="campaign_match_count_mismatch")
     rows=prepared["rows"].get(player.pk,{}) if prepared is not None else {row.fixture_id:row for row in PlayerFixture.objects.filter(fixture__in=fixtures,player=player,team=campaign.winner)}
-    member=bool(rows) or (player.pk in prepared["members"] if prepared is not None else PlayerTeamSeason.objects.filter(player=player,team=campaign.winner,competition_season=campaign.edition).exists())
+    member=bool(rows) or player.pk in prepared["members"]
     numerator=denominator=Decimal("0")
     config=campaign.policy.config
     for fixture in fixtures:
         if fixture.status!=Fixture.Status.FINISHED or fixture.starts_at>campaign.awarded_at or fixture.starts_at>as_of:
             return result(reason="campaign_fixture_not_finished")
-        if not fixture.stats_ingested_at: return result(reason="campaign_player_data_missing")
+        evidence = prepared.get("participation_evidence", {}).get(fixture.pk)
+        if not fixture.stats_ingested_at and evidence is None: return result(reason="campaign_player_data_missing")
         has_players=fixture.pk in prepared["has_players"] if prepared is not None else fixture.playerfixture_set.filter(team=campaign.winner).exists()
         if not has_players: return result(reason="campaign_player_data_missing")
         if not fixture.available_minutes or fixture.available_minutes<=0: return result(reason="match_duration_missing")
@@ -82,13 +121,17 @@ def campaign_contribution(campaign,player,as_of,prepared=None):
         stage=config["stage_aliases"].get(raw_stage)
         if stage is None: return result(reason="stage_not_configured")
         weight=Decimal(str(config["stage_weights"][stage]))
-        minutes=rows[fixture.pk].minutes if fixture.pk in rows else 0
+        minutes=prepared["minutes"].get(fixture.pk, {}).get(player.pk, 0)
         participation=min(Decimal("1"),Decimal(minutes)/Decimal(fixture.available_minutes))
         numerator+=participation*weight
         denominator+=weight
         breakdown["matches"].append({"fixture":fixture.pk,"provider_fixture":fixture.provider_id,
             "stage":stage,"minutes":minutes,"available_minutes":fixture.available_minutes,
             "context_weight":str(weight),"participation":str(participation)})
+        proof = prepared.get("participation_evidence", {}).get(fixture.pk)
+        if proof:
+            breakdown["matches"][-1]["participation_evidence"] = {key: proof[key]
+                for key in ("record", "input_sha256", "source_sha256")}
     breakdown.update(weighted_participation=str(numerator),maximum_participation=str(denominator))
     if not member: return result(reason="player_not_in_winning_campaign")
     return result(numerator/denominator)

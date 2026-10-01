@@ -21,11 +21,12 @@ from apps.rankings.services.publish import publish
 from apps.scoring.models import ScoringFormula
 from apps.scoring.services.achievements import prepare_season_achievements
 from apps.scoring.services.calculate import recompute_scores
-from apps.scoring.services.campaigns import validate_campaign_policy
+from apps.scoring.services.campaigns import prepare_campaign_data, validate_campaign_policy
 from apps.scoring.services.elo import rebuild_elo
 from apps.scoring.services.formulas import validate_formula
 from .sync import ingest_fixture_bundle
 from .profiles import ProfileCatalogue
+from .outcomes import reviewed_outcome, review_reference, winner_fixture_ids
 
 CLUB_IDS={"39","140","135","78","61","2"}  # Verified provider catalog IDs.
 NATIONAL_NAMES={"World Cup","Euro Championship","Copa America","Africa Cup of Nations","Asian Cup","CONCACAF Gold Cup","UEFA Nations League"}
@@ -104,7 +105,7 @@ class ArchiveBackfill:
         saved=RawProviderPayload.objects.filter(provider=self.provider.provider_name,resource_type="archive_manifest",provider_resource_id=key).order_by("-received_at","-pk").first()
         if saved:
             rows=saved.payload["response"]
-            finished=all(row["fixture"]["status"]["short"] in ("FT","AET","PEN","CANC","ABD") for row in rows)
+            finished=all(row["fixture"]["status"]["short"] in ("FT","AET","PEN","CANC","ABD","WO","AWD") for row in rows)
             if saved.received_at.date()==self.today or (finished and date.fromisoformat(edition["end"])<self.today): return rows,saved.payload_sha256
         rows=self.provider._all("fixtures",{"league":league,"season":edition["year"]})
         saved=retained(self.provider.provider_name,"archive_manifest",key,f"/fixtures?league={league}&season={edition['year']}",{"response":rows})
@@ -218,8 +219,13 @@ class ArchiveBackfill:
             cs=descriptor["cs"]
             if cs.season.starts_on.year!=year: continue
             rows=descriptor["rows"]; final=descriptor["final"]; winner_id=None; awarded=None; evidence=None
-            if descriptor["family"]=="domestic":
-                if cs.ends_on>=self.today or not rows or any(row["fixture"]["status"]["short"] not in ("FT","AET","PEN","CANC","ABD") for row in rows): continue
+            review=reviewed_outcome(cs,rows)
+            if review:
+                winner_id=review.payload["winner"]
+                awarded=datetime.fromisoformat(review.payload["awarded_at"])
+                evidence=review_reference(review)
+            elif descriptor["family"]=="domestic":
+                if cs.ends_on>=self.today or not rows or any(row["fixture"]["status"]["short"] not in ("FT","AET","PEN","CANC","ABD","WO","AWD") for row in rows): continue
                 standings_key=f"{cs.competition.provider_id}:{cs.provider_season_id.split(':')[1]}"
                 saved=RawProviderPayload.objects.filter(provider=self.provider.provider_name,resource_type="archive_standings",provider_resource_id=standings_key).order_by("-pk").first()
                 payload=saved.payload if saved else self.provider._request("standings",{"league":cs.competition.provider_id,"season":cs.provider_season_id.split(":")[1]})
@@ -236,6 +242,9 @@ class ArchiveBackfill:
                 if not finished: continue
                 awarded=max(datetime.fromisoformat(item["fixture"]["date"].replace("Z","+00:00")) for item in finished)+timedelta(hours=3)
                 evidence={"source":"final standings","payload_sha256":saved.payload_sha256,"manifest_sha256":descriptor["digest"]}
+                administrative=[{"fixture":row["fixture"]["id"],"status":row["fixture"]["status"]["short"]}
+                    for row in rows if row["fixture"]["status"]["short"] in ("WO","AWD")]
+                if administrative: evidence["administrative_results"]=administrative
             elif final:
                 winning=[str(team["id"]) for team in final["teams"].values() if team.get("winner") is True]
                 if len(winning)!=1: continue
@@ -244,12 +253,15 @@ class ArchiveBackfill:
             if not winner_id or awarded>self.now: continue
             team=Team.objects.filter(provider=self.provider.provider_name,provider_id=winner_id).first()
             if not team: continue
-            expected=[row for row in rows if str(row["teams"]["home"]["id"])==winner_id or str(row["teams"]["away"]["id"])==winner_id]
-            expected=[row for row in expected if row["fixture"]["status"]["short"] not in ("CANC","ABD")]
-            winning=Fixture.objects.filter(competition_season=cs).filter(Q(home_team=team)|Q(away_team=team)).exclude(status="CANCELLED")
-            complete=winning.count()==len(expected) and not winning.filter(Q(stats_ingested_at__isnull=True)|Q(available_minutes__isnull=True)).exists()
-            WinningCampaign.objects.update_or_create(edition=cs,defaults={"winner":team,"policy":descriptor["policy"],"awarded_at":awarded,
-                "verified_at":django_timezone.now(),"evidence":json.dumps(evidence,sort_keys=True),"expected_matches":len(expected),"is_complete":complete})
+            expected=winner_fixture_ids(rows,winner_id)
+            campaign,_=WinningCampaign.objects.update_or_create(edition=cs,defaults={"winner":team,"policy":descriptor["policy"],"awarded_at":awarded,
+                "verified_at":django_timezone.now(),"evidence":json.dumps(evidence,sort_keys=True),"expected_matches":len(expected),"is_complete":False})
+            data=prepare_campaign_data(campaign)
+            complete={row.provider_id for row in data["fixtures"]}==set(expected) and all(
+                row.status=="FINISHED" and row.available_minutes and row.pk in data["has_players"]
+                and (row.stats_ingested_at or row.pk in data["participation_evidence"]) for row in data["fixtures"])
+            campaign.is_complete=bool(complete)
+            campaign.save(update_fields=["is_complete","updated_at"])
 
     def formula(self):
         path=settings.BASE_DIR/"scoring_formulas"/"v1_6.json"

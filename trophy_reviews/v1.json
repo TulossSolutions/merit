@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "outcomes": [
+    {
+      "edition": "61:2019",
+      "winner": "85",
+      "awarded_at": "2020-04-30T23:59:59+00:00",
+      "reviewer": "Merit project owner (approved 2026-10-01)",
+      "source_urls": [
+        "https://www.lfp.fr/assets/20200430_PV_Conseil_Administration_LFP_e824a457fa.pdf",
+        "https://en.psg.fr/teams/first-team/content/paris-saint-germain-dedicates-its-9th-french-championship-title-to-healthcare-workers-and-everyday-heroes"
+      ],
+      "basis": "curtailed_season"
+    },
+    {
+      "edition": "6:2025",
+      "winner": "13",
+      "awarded_at": "2026-01-18T22:00:00+00:00",
+      "reviewer": "Merit project owner (approved 2026-10-01)",
+      "source_urls": [
+        "https://www.cafonline.com/afcon2025/news/gueye-extra-time-stunner-hands-senegal-totalenergies-caf-afcon-2025-title/",
+        "https://www.cafonline.com/news/caf-appeal-board-media-statement/",
+        "https://www.tas-cas.org/generated/assets/lists/dceab111-07bc-435f-b5f9-de88eff9db72/CAS%20Media%20Release_12295_appeal.pdf"
+      ],
+      "basis": "on_pitch_result_pending_appeal"
+    }
+  ],
+  "fixture_reviews": [
+    {
+      "edition": "6:2025",
+      "provider_fixture_id": "1508003",
+      "winner": "13",
+      "on_pitch_status": "AET",
+      "home_score": 1,
+      "away_score": 0,
+      "available_minutes": 120,
+      "reviewer": "Merit project owner (approved 2026-10-01)",
+      "source_urls": [
+        "https://www.cafonline.com/afcon2025/news/gueye-extra-time-stunner-hands-senegal-totalenergies-caf-afcon-2025-title/",
+        "https://www.cafonline.com/news/caf-appeal-board-media-statement/",
+        "https://www.tas-cas.org/generated/assets/lists/dceab111-07bc-435f-b5f9-de88eff9db72/CAS%20Media%20Release_12295_appeal.pdf"
+      ],
+      "basis": "on_pitch_result_pending_appeal"
+    }
+  ],
+  "participation": [
+    {"fixture": "152639", "team": "541", "corroboration": {"reviewer": "Merit data review 2026-10-01", "source_url": "https://www.uefa.com/newsfiles/UCL/2018/2021689_SPS.pdf", "red_cards": 0}},
+    {"fixture": "152640", "team": "541", "corroboration": {"reviewer": "Merit data review 2026-10-01", "source_url": "https://www.uefa.com/newsfiles/UCL/2018/2021695_SPS.pdf", "red_cards": 0}},
+    {"fixture": "152627", "team": "541", "corroboration": {"reviewer": "Merit data review 2026-10-01", "source_url": "https://www.uefa.com/newsfiles/UCL/2018/2021701_SPS.pdf", "red_cards": 0}},
+    {"fixture": "152628", "team": "541", "corroboration": {"reviewer": "Merit data review 2026-10-01", "source_url": "https://www.uefa.com/newsfiles/UCL/2018/2021703_SPS.pdf", "red_cards": 0}},
+    {"fixture": "152623", "team": "541", "corroboration": {"reviewer": "Merit data review 2026-10-01", "source_url": "https://www.uefa.com/newsfiles/UCL/2018/2021708_SPS.pdf", "red_cards": 0}},
+    {"fixture": "152624", "team": "541", "corroboration": {"reviewer": "Merit data review 2026-10-01", "source_url": "https://www.uefa.com/newsfiles/UCL/2018/2021709_SPS.pdf", "red_cards": 0}},
+    {"fixture": "152620", "team": "541", "corroboration": {"reviewer": "Merit data review 2026-10-01", "source_url": "https://www.uefa.com/newsfiles/UCL/2018/2021711_SPS.pdf", "red_cards": 0}},
+    {"fixture": "2796", "team": "157", "corroboration": {"reviewer": "Merit data review 2026-10-01", "source_url": "https://www.bundesliga.com/en/bundesliga/matchday/2018-2019/32/fc-bayern-muenchen-vs-hannover-96/liveticker", "red_cards": 0}},
+    {"fixture": "29264", "team": "496", "corroboration": null},
+    {"fixture": "132513", "team": "27", "corroboration": null},
+    {"fixture": "132516", "team": "27", "corroboration": null},
+    {"fixture": "132527", "team": "27", "corroboration": null},
+    {"fixture": "132531", "team": "27", "corroboration": null},
+    {"fixture": "1508003", "team": "13", "source_resource": "trophy_fixture_source", "corroboration": {"reviewer": "Merit project owner (approved 2026-10-01)", "source_url": "https://www.cafonline.com/afcon2025/news/gueye-extra-time-stunner-hands-senegal-totalenergies-caf-afcon-2025-title/", "red_cards": 0}}
+  ]
+}
