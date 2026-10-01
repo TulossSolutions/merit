@@ -1,5 +1,5 @@
 from django.db import models
-from apps.football.models import Player, Position
+from apps.football.models import Fixture, Player, Position
 
 class RawProviderPayload(models.Model):
     provider=models.CharField(max_length=30); resource_type=models.CharField(max_length=50); provider_resource_id=models.CharField(max_length=100); request_path=models.CharField(max_length=500); payload=models.JSONField(); payload_sha256=models.CharField(max_length=64); received_at=models.DateTimeField(auto_now_add=True); http_status=models.PositiveSmallIntegerField()
@@ -44,3 +44,26 @@ class PlayerIdentityAlias(models.Model):
 class StatsBombBacktestPayload(models.Model):
     resource_type=models.CharField(max_length=30); source_path=models.CharField(max_length=500,unique=True); payload=models.JSONField(); payload_sha256=models.CharField(max_length=64); imported_at=models.DateTimeField(auto_now=True)
     class Meta: indexes=[models.Index(fields=["resource_type"])]
+
+
+class FixtureStatReconstruction(models.Model):
+    class Status(models.TextChoices):
+        PARTIAL = "PARTIAL", "Partial evidence"
+        VERIFIED = "VERIFIED", "Verified"
+        APPLIED = "APPLIED", "Applied"
+
+    version=models.CharField(max_length=50)
+    fixture=models.ForeignKey(Fixture,on_delete=models.PROTECT,related_name="stat_reconstructions")
+    source_provider=models.CharField(max_length=30)
+    source_fixture_id=models.CharField(max_length=100)
+    status=models.CharField(max_length=20,choices=Status.choices)
+    normalized_payload=models.JSONField()
+    verification=models.JSONField()
+    payload_sha256=models.CharField(max_length=64)
+    raw_payload_ids=models.JSONField(default=list)
+    staged_at=models.DateTimeField(auto_now_add=True)
+    applied_at=models.DateTimeField(blank=True,null=True)
+
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=["version","fixture"],name="uniq_fixture_reconstruction_version")]
+        indexes=[models.Index(fields=["version","status"])]
