@@ -128,6 +128,18 @@ def test_reviewed_campaign_ids_include_administrative_results_but_not_cancelled_
     assert winner_fixture_ids(rows, "13") == ["1", "2"]
 
 
+def test_official_champion_review_requires_the_complete_winner_campaign():
+    _, edition, _, _, _ = setup_edition("61:2025")
+    rows = [source_row("1", league=61, year=2025), source_row("2", league=61, year=2025)]
+    rows[1]["fixture"]["date"] = "2026-05-17T19:00:00+00:00"
+    outcome = {"edition": "61:2025", "winner": "13",
+        "awarded_at": "2026-05-17T22:00:00+00:00", "expected_fixture_ids": ["1", "2"],
+        "reviewer": "reviewer", "source_urls": ["https://ligue1.com/official-champion"],
+        "basis": "official_champion"}
+    record = retain_outcome_review(edition, outcome, rows)
+    assert record.payload["expected_fixture_ids"] == ["1", "2"]
+
+
 def test_trophy_review_command_is_dry_run_by_default():
     output = StringIO()
     call_command("apply_trophy_reviews", stdout=output)

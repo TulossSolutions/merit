@@ -23,6 +23,17 @@
         "https://www.tas-cas.org/generated/assets/lists/dceab111-07bc-435f-b5f9-de88eff9db72/CAS%20Media%20Release_12295_appeal.pdf"
       ],
       "basis": "on_pitch_result_pending_appeal"
+    },
+    {
+      "edition": "61:2025",
+      "winner": "85",
+      "awarded_at": "2026-05-17T22:00:00+00:00",
+      "reviewer": "Merit data review 2026-10-01",
+      "source_urls": [
+        "https://ligue1.com/fr/articles/l1_article_5110-le-titre-du-psg-en-chiffres",
+        "https://www.psg.fr/en/content/paris-crowned-champions-with-win-over-lens-psg-ligue-1-champions-2025-2026"
+      ],
+      "basis": "official_champion"
     }
   ],
   "fixture_reviews": [

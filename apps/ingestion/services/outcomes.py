@@ -10,7 +10,8 @@ from apps.ingestion.providers.base import ProviderFixtureBundle
 from .participation import payload_checksum, payload_checksums
 
 
-OUTCOME_BASES = {"curtailed_season", "adjudicated_result", "on_pitch_result_pending_appeal"}
+OUTCOME_BASES = {"curtailed_season", "adjudicated_result", "official_champion",
+    "on_pitch_result_pending_appeal"}
 
 
 def winner_fixture_ids(rows, winner_id):
