@@ -39,7 +39,7 @@ def player_detail(request,slug):
         return HttpResponsePermanentRedirect(target)
     public_entries=list(RankingEntry.objects.filter(player=player,snapshot__is_public=True,snapshot__season__is_published=True)
         .select_related("snapshot__season","snapshot__formula","team")
-        .order_by("-snapshot__season__starts_on","-snapshot__cutoff_at","-snapshot__published_at","-snapshot_id"))
+        .order_by("-snapshot__season__starts_on","-snapshot__cutoff_at","-snapshot__formula__is_active","-snapshot__published_at","-snapshot_id"))
     latest_by_season={}
     for item in public_entries:
         latest_by_season.setdefault(item.snapshot.season_id,item)
@@ -86,13 +86,13 @@ def player_detail(request,slug):
         "season_history":season_history,"seasons":[item.snapshot.season for item in season_history],"selected_season":selected_season,
         "chart_points":chart_points,"chart_dates":chart_dates,"chart_ranks":chart_ranks,"required_minutes":required_minutes,"page_title":player.name})
 def compare(request):
-    a=Player.objects.filter(slug=request.GET.get("a","")).first(); b=Player.objects.filter(slug=request.GET.get("b","")).first(); snapshot=latest_snapshot(); rows=[]
+    a=Player.objects.exclude(provider_id="0").filter(slug=request.GET.get("a","")).first(); b=Player.objects.exclude(provider_id="0").filter(slug=request.GET.get("b","")).first(); snapshot=latest_snapshot(); rows=[]
     for player in (a,b): rows.append(RankingEntry.objects.filter(snapshot=snapshot,player=player).select_related("player","team").first() if player and snapshot else None)
     template="players/partials/comparison.html" if request.headers.get("HX-Request")=="true" else "players/compare.html"
-    return render(request,template,{"snapshot":snapshot,"a":a,"b":b,"rows":rows,"players":Player.objects.filter(ranking_entries__snapshot=snapshot).distinct().order_by("name") if snapshot else Player.objects.none(),"different_positions":a and b and a.primary_position!=b.primary_position,"page_title":"Compare players"})
+    return render(request,template,{"snapshot":snapshot,"a":a,"b":b,"rows":rows,"players":Player.objects.exclude(provider_id="0").filter(ranking_entries__snapshot=snapshot).distinct().order_by("name") if snapshot else Player.objects.none(),"different_positions":a and b and a.primary_position!=b.primary_position,"page_title":"Compare players"})
 def player_search(request):
     q=request.GET.get("q","").strip(); qs=Player.objects.none()
     if len(q)>=2:
-        qs=Player.objects.filter(Q(name__icontains=q)|Q(common_name__icontains=q),canonical_identity__isnull=True); position=request.GET.get("position")
+        qs=Player.objects.exclude(provider_id="0").filter(Q(name__icontains=q)|Q(common_name__icontains=q),canonical_identity__isnull=True); position=request.GET.get("position")
         if position in Position.values: qs=qs.filter(primary_position=position)
     return render(request,"players/partials/search_results.html",{"players":qs.order_by("name")[:10]})

@@ -6,7 +6,6 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from apps.ingestion.models import RawProviderPayload
-from apps.ingestion.providers.base import ProviderFixtureBundle
 from .participation import payload_checksum, payload_checksums
 
 
@@ -136,6 +135,71 @@ def retain_fixture_review(edition, payload, source):
         payload_sha256=payload_checksum(payload), http_status=200)
 
 
+def reviewed_player_payload(source, fixture_row, review):
+    """Validate retained provider statistics and keep appearances only."""
+    payload = source.payload.get("players") or {"response": []}
+    response = payload.get("response") if isinstance(payload, dict) else None
+    if response == [] or (isinstance(response, list) and response
+            and all(isinstance(row, dict) and row.get("players") == [] for row in response)):
+        return {"response": []}, []
+    if not isinstance(response, list):
+        raise ValidationError("Reviewed fixture player-stat response is malformed")
+    teams = fixture_row.get("teams") or {}
+    expected = {str((teams.get(side) or {}).get("id")): side for side in ("home", "away")}
+    if "None" in expected or len(expected) != 2:
+        raise ValidationError("Reviewed fixture teams are malformed")
+    by_team = {}
+    player_ids = set()
+    summaries = []
+    for team_row in response:
+        if not isinstance(team_row, dict) or not isinstance(team_row.get("players"), list):
+            raise ValidationError("Reviewed fixture player-stat team row is malformed")
+        team_id = str((team_row.get("team") or {}).get("id"))
+        if team_id not in expected or team_id in by_team:
+            raise ValidationError("Reviewed fixture player statistics require one row per fixture team")
+        appearances = []
+        starters = 0
+        reported_minutes = 0
+        reported_goals = 0
+        for row in team_row["players"]:
+            player = row.get("player") or {}
+            player_id = player.get("id")
+            if not isinstance(player_id, int) or player_id < 1 or player_id in player_ids:
+                raise ValidationError("Reviewed fixture player identities must be unique positive integers")
+            player_ids.add(player_id)
+            statistics = row.get("statistics")
+            if not isinstance(statistics, list) or len(statistics) != 1 or not isinstance(statistics[0], dict):
+                raise ValidationError("Reviewed fixture players require one statistics row")
+            stats = statistics[0]
+            games = stats.get("games") or {}
+            minutes = games.get("minutes") or 0
+            goals = (stats.get("goals") or {}).get("total") or 0
+            if (not isinstance(minutes, int) or isinstance(minutes, bool) or minutes < 0
+                    or minutes > review["available_minutes"] or not isinstance(goals, int)
+                    or isinstance(goals, bool) or goals < 0):
+                raise ValidationError("Reviewed fixture player minutes or goals are invalid")
+            if not minutes:
+                continue  # Retain unused squad rows only in the immutable source payload.
+            if not isinstance(games.get("substitute"), bool):
+                raise ValidationError("Reviewed fixture appearances require starter/substitute evidence")
+            starters += not games["substitute"]
+            reported_minutes += minutes
+            reported_goals += goals
+            appearances.append(deepcopy(row))
+        side = expected[team_id]
+        if not appearances or starters != 11 or reported_goals != review[f"{side}_score"]:
+            raise ValidationError("Reviewed fixture appearances do not reconcile with starters and score")
+        theoretical = review["available_minutes"] * 11
+        summaries.append({"team_id": team_id, "source_squad_rows": len(team_row["players"]),
+            "normalized_appearances": len(appearances), "starters": starters,
+            "reported_minutes": reported_minutes, "theoretical_minutes": theoretical,
+            "minute_delta": reported_minutes - theoretical, "reported_goals": reported_goals})
+        by_team[team_id] = {"team": deepcopy(team_row.get("team") or {}), "players": appearances}
+    if set(by_team) != set(expected):
+        raise ValidationError("Reviewed fixture player statistics must cover both fixture teams")
+    return {"response": [by_team[str(teams[side]["id"])] for side in ("home", "away")]}, summaries
+
+
 def reviewed_fixture_bundle(edition, record, provider):
     if (record.resource_type != "trophy_fixture_review"
             or record.payload_sha256 not in payload_checksums(record.payload)):
@@ -150,10 +214,13 @@ def reviewed_fixture_bundle(edition, record, provider):
     row["goals"] = {"home": review["home_score"], "away": review["away_score"]}
     for side in ("home", "away"):
         row["teams"][side]["winner"] = str(row["teams"][side]["id"]) == review["winner"]
-    raw = {"fixture": row, "players": {"response": []}, "operator_review": {
+    players, summaries = reviewed_player_payload(source, row, review)
+    raw = {"fixture": row, "players": players, "operator_review": {
         "record": record.pk, "review_sha256": record.payload_sha256,
-        "source_payload": source.pk, "source_sha256": source.payload_sha256}}
-    fixture = provider._normalize_fixture_meta(row)
-    if fixture.status != "FINISHED" or fixture.available_minutes != review["available_minutes"]:
+        "source_payload": source.pk, "source_sha256": source.payload_sha256,
+        "player_stats": summaries}}
+    bundle = provider.normalize_fixture(raw)
+    if (bundle.fixture.status != "FINISHED"
+            or bundle.fixture.available_minutes != review["available_minutes"]):
         raise ValidationError("Reviewed fixture did not normalize to a completed match")
-    return ProviderFixtureBundle(fixture, tuple(), raw)
+    return bundle

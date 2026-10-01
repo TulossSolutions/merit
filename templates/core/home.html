@@ -34,8 +34,6 @@
   {% endif %}
 </section>
 
-{% include 'components/coverage_notice.html' %}
-
 <section class="leaders" aria-labelledby="leaders-title">
   <div class="section-heading">
     <div>
@@ -93,5 +91,7 @@
     <a href="{% url 'methodology' %}">Read the methodology <span aria-hidden="true">→</span></a>
   </div>
 </section>
+
+{% include 'components/coverage_notice.html' %}
 
 {% endblock %}

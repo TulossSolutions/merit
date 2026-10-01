@@ -90,10 +90,12 @@ class Command(BaseCommand):
                             raise ValidationError(f"Retained reviewed-fixture source is missing: {item['provider_fixture_id']}")
                         payload = {**item, "source_payload": source.pk, "source_sha256": source.payload_sha256}
                         review = retain_fixture_review(edition, payload, source)
+                        bundle = reviewed_fixture_bundle(edition, review, provider)
                         raw_exists = any((row.payload.get("operator_review") or {}).get("record") == review.pk
+                            and (not bundle.participations or (row.payload.get("players") or {}).get("response"))
                             for row in RawProviderPayload.objects.filter(provider=provider.provider_name,
                                 resource_type="fixture", provider_resource_id=item["provider_fixture_id"]).order_by("-pk")[:5])
-                        ingest_fixture_bundle(reviewed_fixture_bundle(edition, review, provider), edition,
+                        ingest_fixture_bundle(bundle, edition,
                             provider.provider_name, "local:operator-reviewed-fixture", retain_raw=not raw_exists)
                         touched.add(edition.pk)
                     for item in config["outcomes"]:

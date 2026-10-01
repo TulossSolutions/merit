@@ -4,7 +4,7 @@ import pytest
 from django.core.cache import cache
 from django.core.management import call_command
 from django.test import Client
-from apps.football.models import Position, Season
+from apps.football.models import Player, Position, Season
 from apps.scoring.models import PlayerSeasonScore, ScoringFormula
 from apps.scoring.services.calculate import recompute_scores
 from apps.scoring.services.elo import rebuild_elo
@@ -91,6 +91,17 @@ def test_position_tabs_highlight_current_filter(pipeline):
         response=client.get(f"/rankings/{slug}/",HTTP_HX_REQUEST="true")
         assert f"hx-get=\"/rankings/{slug}/?season=2026-27\"".encode() in response.content
         assert response.content.count(b'aria-current="page"')==1
+
+def test_provider_id_zero_players_are_excluded_from_public_lists(pipeline):
+    snapshot,_=pipeline
+    hidden=Player.objects.create(provider="api_football",provider_id="0",name="Unverified Placeholder",primary_position=Position.FWD)
+    RankingEntry.objects.create(snapshot=snapshot,player=hidden,position=Position.FWD,rank=999,score=1,minutes=90)
+    cache.clear()
+    client=Client()
+    for url in ("/", "/rankings/attackers/", "/compare/", "/players/search/?q=Unverified", "/sitemap.xml"):
+        response=client.get(url)
+        assert response.status_code==200
+        assert b"Unverified Placeholder" not in response.content
 
 def test_inactive_existing_goal_rate_is_displayed_but_zero_is_dash(pipeline):
     snapshot,_=pipeline

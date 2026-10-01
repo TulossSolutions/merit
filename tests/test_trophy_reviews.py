@@ -2,6 +2,8 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from io import StringIO
 import json
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import pytest
 from django.conf import settings
@@ -20,6 +22,7 @@ from apps.ingestion.services.participation import (derive_participation, partici
     validate_reviewed_participation)
 from apps.ingestion.services.sync import ingest_fixture_bundle
 from apps.scoring.services.campaigns import campaign_contribution
+from apps.scoring.models import ScoringFormula
 
 
 pytestmark = pytest.mark.django_db
@@ -58,11 +61,29 @@ def source_row(fixture_id="1", league=2, year=2017, status="FT", duration=90):
         "statistics": [{"team": {"id": 13}, "statistics": [{"type": "Red Cards", "value": 0}]}]}
 
 
-def raw_payload(resource, fixture_id, row):
-    payload = {"fixture": row, "players": {"response": [{"team": {"id": 13}, "players": []}]}}
+def raw_payload(resource, fixture_id, row, player_response=None):
+    response = [{"team": {"id": 13}, "players": []}] if player_response is None else player_response
+    payload = {"fixture": row, "players": {"response": response}}
     return RawProviderPayload.objects.create(provider="api_football", resource_type=resource,
         provider_resource_id=fixture_id, request_path="test", payload=payload,
         payload_sha256=payload_checksum(payload), http_status=200)
+
+
+def retained_player_statistics(duration=120, away_minute_delta=0):
+    response = []
+    for team_id, start_id, goals in ((13, 100, 1), (31, 200, 0)):
+        players = []
+        for offset in range(11):
+            minutes = duration - away_minute_delta if team_id == 31 and offset == 0 else duration
+            players.append({"player": {"id": start_id + offset, "name": f"Player {start_id + offset}"},
+                "statistics": [{"games": {"minutes": minutes, "substitute": False,
+                    "position": "G" if offset == 0 else "D"},
+                    "goals": {"total": goals if offset == 1 else 0}, "shots": {"total": goals}}]})
+        players.append({"player": {"id": start_id + 20, "name": f"Unused {start_id + 20}"},
+            "statistics": [{"games": {"minutes": None, "substitute": True, "position": "M"},
+                "goals": {"total": None}}]})
+        response.append({"team": {"id": team_id, "name": f"Team {team_id}"}, "players": players})
+    return response
 
 
 def test_verified_participation_unblocks_trophy_without_inventing_performance_rows():
@@ -188,6 +209,86 @@ def test_pending_appeal_review_preserves_on_pitch_result_but_not_player_stats():
         "source_urls": ["https://www.cafonline.com/final"], "basis": "on_pitch_result_pending_appeal"}
     record = retain_outcome_review(edition, outcome, [row])
     assert reviewed_outcome(edition, [row]).pk == record.pk
+
+
+@override_settings(API_FOOTBALL_KEY="test")
+def test_pending_appeal_review_restores_valid_retained_player_stats_without_inventing_minutes():
+    _, edition, _, _, _ = setup_edition("6:2025")
+    edition.competition.provider_id = "6"
+    edition.competition.save(update_fields=["provider_id"])
+    row = source_row("1508003", 6, 2025, "WO", 120)
+    source = raw_payload("trophy_fixture_source", "1508003", row,
+        retained_player_statistics(away_minute_delta=14))
+    review = retain_fixture_review(edition, {"edition": "6:2025", "provider_fixture_id": "1508003",
+        "winner": "13", "on_pitch_status": "AET", "home_score": 1, "away_score": 0,
+        "available_minutes": 120, "reviewer": "owner",
+        "source_urls": ["https://www.cafonline.com/final"], "basis": "on_pitch_result_pending_appeal",
+        "source_payload": source.pk, "source_sha256": source.payload_sha256}, source)
+    bundle = reviewed_fixture_bundle(edition, review, ApiFootballProvider())
+    fixture = ingest_fixture_bundle(bundle, edition, "api_football", "local:review")
+
+    summaries = bundle.raw_payload["operator_review"]["player_stats"]
+    assert len(bundle.participations) == 22
+    assert {row["team_id"]: row["minute_delta"] for row in summaries} == {"13": 0, "31": -14}
+    assert all(row["source_squad_rows"] == 12 and row["normalized_appearances"] == 11 for row in summaries)
+    assert fixture.stats_ingested_at is not None and fixture.player_data_unavailable_at is None
+    assert fixture.playerfixture_set.count() == 22
+    assert not fixture.playerfixture_set.filter(minutes=0).exists()
+
+
+@override_settings(API_FOOTBALL_KEY="test")
+def test_pending_appeal_player_stats_must_reconcile_with_reviewed_score():
+    _, edition, _, _, _ = setup_edition("6:2025")
+    edition.competition.provider_id = "6"
+    edition.competition.save(update_fields=["provider_id"])
+    row = source_row("1508003", 6, 2025, "WO", 120)
+    players = retained_player_statistics()
+    players[0]["players"][1]["statistics"][0]["goals"]["total"] = 0
+    source = raw_payload("trophy_fixture_source", "1508003", row, players)
+    review = retain_fixture_review(edition, {"edition": "6:2025", "provider_fixture_id": "1508003",
+        "winner": "13", "on_pitch_status": "AET", "home_score": 1, "away_score": 0,
+        "available_minutes": 120, "reviewer": "owner",
+        "source_urls": ["https://www.cafonline.com/final"], "basis": "on_pitch_result_pending_appeal",
+        "source_payload": source.pk, "source_sha256": source.payload_sha256}, source)
+    with pytest.raises(ValidationError, match="starters and score"):
+        reviewed_fixture_bundle(edition, review, ApiFootballProvider())
+
+
+def test_afcon_coverage_repair_is_additive_local_only_and_uses_shared_lock():
+    season, edition, _, winner, opponent = setup_edition("6:2025")
+    season.name = "2025/26"; season.slug = "2025-26"; season.save(update_fields=["name", "slug"])
+    edition.competition.provider_id = "6"; edition.competition.save(update_fields=["provider_id"])
+    fixture = Fixture.objects.create(provider="api_football", provider_id="1508003", competition_season=edition,
+        home_team=winner, away_team=opponent, starts_at=datetime(2026, 1, 18, 19, tzinfo=timezone.utc),
+        status="FINISHED", stage_name="Final", home_score=1, away_score=0, available_minutes=120)
+    review = RawProviderPayload.objects.create(provider="api_football", resource_type="trophy_fixture_review",
+        provider_resource_id="1508003", request_path="test", payload={}, payload_sha256="review", http_status=200)
+    formula = ScoringFormula.objects.create(version="1.6", name="Active", config={},
+        checksum_sha256="formula", is_active=True)
+    bundle = Mock(participations=[object()], raw_payload={"operator_review": {"record": review.pk},
+        "players": {"response": [{"team": {"id": 13}}]}})
+    ingested = Mock(stats_ingested_at=datetime.now(timezone.utc), player_data_unavailable_at=None)
+    ingested.playerfixture_set.filter.return_value.count.return_value = 33
+    snapshot = SimpleNamespace(pk=999, coverage_summary={"gaps": [
+        {"competition": "UEFA Champions League", "stage": "Qualifying"}]})
+    output = StringIO()
+    with patch("apps.ingestion.management.commands.repair_afcon_final_coverage.validated_bundle",
+            return_value=(edition, review, bundle)), \
+            patch("apps.ingestion.management.commands.repair_afcon_final_coverage.ingest_fixture_bundle",
+                return_value=ingested) as ingest, \
+            patch("apps.ingestion.management.commands.repair_afcon_final_coverage.rebuild_elo") as elo, \
+            patch("apps.ingestion.management.commands.repair_afcon_final_coverage.recompute_scores") as recompute, \
+            patch("apps.ingestion.management.commands.repair_afcon_final_coverage.publish",
+                return_value=snapshot) as publish_snapshot:
+        call_command("repair_afcon_final_coverage", apply=True, stdout=output)
+    assert fixture.stats_ingested_at is None  # The mocked fixture proves the command does not replace history itself.
+    ingest.assert_called_once()
+    elo.assert_called_once_with(season)
+    recompute.assert_called_once()
+    assert recompute.call_args.args == (season, formula, datetime(2026, 7, 20, tzinfo=timezone.utc))
+    publish_snapshot.assert_called_once_with(season, formula, datetime(2026, 7, 20, tzinfo=timezone.utc),
+        allow_unavailable=True)
+    assert "API calls: 0" in output.getvalue()
 
 
 def test_reviewed_campaign_ids_include_administrative_results_but_not_cancelled_matches():

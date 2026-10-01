@@ -109,13 +109,16 @@ def test_coverage_warning_on_full_pages_and_htmx_fragments(covered_period):
     snapshot=publish(season,formula,cutoff,allow_unavailable=True)
     player=snapshot.entries.first().player
     client=Client()
-    routes=[("/",{}),("/rankings/attackers/",{}),("/rankings/attackers/",{"HTTP_HX_REQUEST":"true"}),
-        (f"/players/{player.slug}/",{}),(f"/seasons/{season.slug}/",{}),(f"/compare/?a={player.slug}",{}),(f"/compare/?a={player.slug}",{"HTTP_HX_REQUEST":"true"})]
-    for route,headers in routes:
+    routes=[("/",{},b"Read the methodology"),("/rankings/attackers/",{},b"How scores are calculated"),
+        ("/rankings/attackers/",{"HTTP_HX_REQUEST":"true"},b"How scores are calculated"),
+        (f"/players/{player.slug}/",{},b"Compare this player"),(f"/seasons/{season.slug}/",{},b"Choose a position"),
+        (f"/compare/?a={player.slug}",{},b"compare-grid"),(f"/compare/?a={player.slug}",{"HTTP_HX_REQUEST":"true"},b"compare-grid")]
+    for route,headers,final_content in routes:
         response=client.get(route,**headers)
         assert response.status_code==200
         assert b"Incomplete coverage: 2 of 3 completed matches (66.7%)" in response.content
         assert b"Trophy credit still requires a complete winning-team campaign" in response.content
+        assert response.content.index(b"Incomplete coverage:") > response.content.index(final_content)
 
 
 def test_legacy_snapshots_do_not_invent_coverage(covered_period):

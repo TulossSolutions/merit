@@ -28,8 +28,6 @@
   {% endif %}
 </section>
 
-{% include 'components/coverage_notice.html' with snapshot=entry.snapshot %}
-
 {% if score and score.eligible %}
 <section>
   <div class="section-heading">
@@ -109,4 +107,5 @@
 </section>
 
 <a class="button mt-8" href="{% url 'compare' %}?a={{ player.slug }}">Compare this player</a>
+{% include 'components/coverage_notice.html' with snapshot=entry.snapshot %}
 {% endblock %}

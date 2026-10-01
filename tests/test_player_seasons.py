@@ -9,6 +9,7 @@ from django.urls import reverse
 
 from apps.football.models import Player, Position, Season
 from apps.rankings.models import RankingEntry, RankingSnapshot
+from apps.rankings.services.queries import latest_snapshot
 from apps.scoring.models import PlayerSeasonScore, ScoringFormula
 
 
@@ -109,6 +110,25 @@ def test_season_history_uses_latest_public_snapshot_per_season(client, player_se
     html = response.content.decode()
     assert '?season=2024-25"' in html and '?season=2026-27"' in html
     assert 'value="2025-26"' not in html and 'value="2023-24"' not in html
+
+
+def test_active_formula_wins_same_cutoff_even_when_legacy_replay_published_later(client, player_seasons):
+    formula = player_seasons["formula"]
+    formula.is_active = True
+    formula.save(update_fields=["is_active"])
+    current_entry = player_seasons["current_entry"]
+    legacy_formula = ScoringFormula.objects.exclude(pk=formula.pk).first()
+    legacy = make_snapshot(
+        player_seasons["current"], legacy_formula, current_entry.snapshot.cutoff_at,
+        published=current_entry.snapshot.published_at + timedelta(days=1),
+    )
+    make_entry(legacy, current_entry.player, rank=1, score=99, position=Position.MID)
+
+    assert latest_snapshot(player_seasons["current"]) == current_entry.snapshot
+    response = client.get(reverse("player_detail", args=[current_entry.player.slug]), {"season": "2026-27"})
+    assert response.context["entry"] == current_entry
+    assert response.context["entry"].position == Position.FWD
+    assert b"Attacker" in response.content
 
 
 def test_historical_only_player_defaults_to_latest_published_season(client, player_seasons):
