@@ -34,6 +34,10 @@ def publish(season,formula,cutoff,force=False,*,allow_unavailable=False,weekly_r
             coverage["position_profiles"]["policy"]="profile_first_reviewed_fallback_all_imported_seasons"
             coverage["position_profiles"]["reviewed_players"]=PlayerSeasonScore.objects.filter(
                 season=season,formula=formula,as_of=cutoff,context_summary__award_position__source="manual_reviewed_position").count()
+        if formula.config.get("position_overrides"):
+            coverage["position_profiles"]["policy"]="owner_override_profile_first_reviewed_fallback_all_imported_seasons"
+            coverage["position_profiles"]["overridden_players"]=PlayerSeasonScore.objects.filter(
+                season=season,formula=formula,as_of=cutoff,context_summary__award_position__source="manual_position_override").count()
     snapshot=RankingSnapshot.objects.create(season=season,formula=formula,published_at=timezone.now(),cutoff_at=cutoff,is_public=False,
         coverage_summary=coverage)
     by_position={p:[] for p in (Position.GK,Position.DEF,Position.MID,Position.FWD)}

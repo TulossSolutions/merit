@@ -44,7 +44,7 @@ def provider_for(pages):
     return provider
 
 
-def period(provider, year=2026, positions=("M","F")):
+def period(provider, year=2026, positions=("M","F"), player_ids=(762,20589), names=("Vinicius","Bryan Mbeumo")):
     season=Season.objects.create(name=f"{year}/{str(year+1)[-2:]}",slug=f"{year}-{str(year+1)[-2:]}",
         starts_on=date(year,8,1),ends_on=date(year+1,5,31),is_current=year==2026)
     comp,_=Competition.objects.get_or_create(provider="api_football",provider_id="39",defaults={"name":"Premier League",
@@ -69,7 +69,7 @@ def period(provider, year=2026, positions=("M","F")):
             "teams":{"home":{"id":10,"name":"Home"},"away":{"id":20,"name":"Away"}},"goals":{"home":1,"away":0}}
         rows=[{"team":{"id":team},"players":[{"player":{"id":pid,"name":name},
             "statistics":[{"games":{"position":role,"minutes":90},"goals":{"total":1 if team==10 else 0}}]}]}
-            for team,pid,name in ((10,762,"Vinicius"),(20,20589,"Bryan Mbeumo"))]
+            for team,pid,name in ((10,player_ids[0],names[0]),(20,player_ids[1],names[1]))]
         ingest_fixture_bundle(provider.normalize_fixture({"fixture":metadata,"players":{"response":rows}}),edition,"api_football")
     return season,datetime(year,8,13,23,tzinfo=timezone.utc)
 
@@ -281,10 +281,11 @@ def test_v1_4_changes_only_category_policy_not_weights_or_trophy_rules():
     assert old==new
 
 
-def test_archive_uses_v1_5_and_requires_complete_profile_catalogue():
+def test_archive_uses_v1_6_and_requires_complete_profile_catalogue():
     provider=provider_for({1:profile_page(1)})
     job=ArchiveBackfill(provider,report=Mock())
     assert job.formula().config["position_source"]=="api_football_profile_with_reviewed_fallback"
+    assert job.formula().version=="1.6"
     with pytest.raises(ValueError,match="incomplete"):
         ProfileCatalogue(provider,report=Mock()).apply_profiles()
     response=Client().get("/methodology/")
@@ -303,10 +304,10 @@ def test_archive_scans_profiles_before_ingestion_then_publishes_new_players_from
     job.ingest_period=ingest
     result=job.run()
     assert result["periods"]["2026-27"]["publication"]=="published"
-    assert result["periods"]["2026-27"]["formula"]=="1.5"
+    assert result["periods"]["2026-27"]["formula"]=="1.6"
     assert result["status"]=="caught_up" and provider._request.call_count==1
     assert PlayerPositionProfile.objects.count()==2
-    assert ScoringFormula.objects.get(is_active=True).version=="1.5"
+    assert ScoringFormula.objects.get(is_active=True).version=="1.6"
 
 
 def test_known_profile_category_without_raw_evidence_is_not_accepted():

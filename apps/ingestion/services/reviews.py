@@ -9,7 +9,7 @@ from django.utils import timezone
 from apps.football.models import Player,PlayerFixture,PlayerTeamSeason,Position
 from apps.ingestion.models import PlayerIdentityAlias,ReviewedPlayerPosition,PlayerPositionProfile
 from apps.scoring.models import PlayerSeasonScore
-from .positions import latest_reviews
+from .positions import active_position_overrides,latest_reviews
 
 LABELS={label:position for position,label in Position.choices if position!=Position.UNKNOWN}
 
@@ -83,8 +83,11 @@ def import_corrections(path,aliases=(),reviewer="project owner",provider="api_fo
         if record.position!=position: raise ValidationError("Immutable review source has conflicting position")
         created+=new
     reviews=latest_reviews(canonical_corrections)
+    overrides=active_position_overrides()
     for player,_ in canonical_corrections.values():
         profile=PlayerPositionProfile.objects.filter(player=player).first()
         player.primary_position=profile.position if profile and profile.position!=Position.UNKNOWN else reviews[player.pk].position
+        override=overrides.get(f"{player.provider}:{player.provider_id}")
+        if override: player.primary_position=override["position"]
         player.save(update_fields=["primary_position","updated_at"])
     return {"supplied":len(corrections),"created_reviews":created,"canonical_players":len(canonical_corrections),"moved_appearances":moved,"source_sha256":digest}

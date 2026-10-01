@@ -252,11 +252,11 @@ class ArchiveBackfill:
                 "verified_at":django_timezone.now(),"evidence":json.dumps(evidence,sort_keys=True),"expected_matches":len(expected),"is_complete":complete})
 
     def formula(self):
-        path=settings.BASE_DIR/"scoring_formulas"/"v1_5.json"
+        path=settings.BASE_DIR/"scoring_formulas"/"v1_6.json"
         with path.open(encoding="utf8") as handle: config=json.load(handle)
         checksum=validate_formula(config)
         formula,created=ScoringFormula.objects.get_or_create(version=config["version"],defaults={"name":config["name"],"config":config,"checksum_sha256":checksum,"notes":config.get("notes","")})
-        if not created and formula.checksum_sha256!=checksum: raise ValidationError("Immutable formula v1.5 already has different rules")
+        if not created and formula.checksum_sha256!=checksum: raise ValidationError("Immutable formula v1.6 already has different rules")
         return formula
 
     def publish_period(self,year,summary):

@@ -10,7 +10,7 @@ from apps.ingestion.models import PlayerPositionProfile,RawProviderPayload
 from apps.ingestion.providers.base import ProviderRequestLimitReached
 from apps.ingestion.providers.positions import normalize_position
 from apps.football.award_periods import award_year,ensure_award_period
-from .positions import latest_reviews
+from .positions import active_position_overrides,latest_reviews
 from .reviews import resolve_provider_aliases
 
 logger=logging.getLogger(__name__)
@@ -60,6 +60,9 @@ def sync_reference(provider,season):
     for review in latest_reviews().values():
         pid=review.player.provider_id
         if review.player.provider==provider_name and profile_positions.get(pid)=="UNKNOWN": profile_positions[pid]=review.position
+    for identity,review in active_position_overrides().items():
+        provider_key,_,pid=identity.partition(":")
+        if provider_key==provider_name: profile_positions[pid]=review["position"]
     for competition in season.competitionseason_set.filter(competition__is_tracked=True,competition__provider=provider_name).select_related("competition"):
         if not competition.provider_season_id:
             candidates=provider.list_seasons(competition.competition.provider_id)

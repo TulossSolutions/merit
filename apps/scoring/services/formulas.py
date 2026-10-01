@@ -11,9 +11,14 @@ SEMVER=re.compile(r"^\d+\.\d+$")
 def canonical_bytes(config): return json.dumps(config,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()
 def validate_formula(config):
     from .achievements import validate_achievement_config
+    from apps.ingestion.services.positions import PROFILE_SOURCES,validate_position_overrides
     validate_achievement_config(config.get("achievements"))
     if config.get("position_source","match") not in ("match","api_football_profile","api_football_profile_with_reviewed_fallback"):
         raise ValueError("Unsupported award position source")
+    overrides=config.get("position_overrides",{})
+    validate_position_overrides(overrides)
+    if overrides and config.get("position_source") not in PROFILE_SOURCES:
+        raise ValueError("Position overrides require profile-based award categories")
     if not SEMVER.match(config.get("version","")): raise ValueError("Formula version must use major.minor format")
     if set(config.get("positions",{})) != {"GK","DEF","MID","FWD"}: raise ValueError("Formula requires exactly GK, DEF, MID and FWD")
     if not 0 <= Decimal(str(config.get("coverage_threshold"))) <= 1: raise ValueError("Invalid coverage threshold")

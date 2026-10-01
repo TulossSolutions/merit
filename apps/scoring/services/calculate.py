@@ -48,7 +48,8 @@ def recompute_scores(season,formula,as_of):
     profiles={}
     if profile_based:
         profiles=award_positions({row.player_id for row in rows},
-            reviewed=formula.config["position_source"]=="api_football_profile_with_reviewed_fallback")
+            reviewed=formula.config["position_source"]=="api_football_profile_with_reviewed_fallback",
+            overrides=formula.config.get("position_overrides"))
     grouped=defaultdict(list)
     for row in rows:
         position=profiles[row.player_id]["position"] if profile_based else row.position
