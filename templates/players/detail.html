@@ -4,10 +4,10 @@
   <div class="flex items-start gap-4">
     {% if player.image_url %}<img class="player-image" src="{{ player.image_url }}" alt="{{ player.name }}">{% endif %}
     <div>
-      <p class="eyebrow">{% if entry %}{{ entry.get_position_display }}{% else %}{{ player.get_primary_position_display }}{% endif %}</p>
+      <p class="eyebrow">{% if entry %}{{ entry.get_position_display }}{% if entry.category_change_notice and entry.movement_state != 'new_category' %}{% include 'components/category_notice.html' %}{% endif %}{% else %}{{ player.get_primary_position_display }}{% endif %}</p>
       <h1>{{ player.name }}</h1>
       <p class="mt-2 text-sm text-muted">{{ entry.team.name|default:'Team unavailable' }}{% if player.nationality_code %} · {{ player.nationality_code }}{% endif %}</p>
-      <p class="mt-2 text-xs text-muted">{% if entry %}{% include 'components/movement.html' %}{% if entry.movement_state == 'new_category' %}{% include 'components/category_notice.html' %}{% endif %} · {% endif %}{{ score.minutes|default:0 }} minutes · {{ score.appearances|default_if_none:'—'|default:'—' }} appearances</p>
+      <p class="mt-2 text-xs text-muted">{% if entry %}{% include 'components/movement.html' %}{% if entry.category_change_notice and entry.movement_state == 'new_category' %}{% include 'components/category_notice.html' %}{% endif %} · {% endif %}{{ score.minutes|default:0 }} minutes · {{ score.appearances|default_if_none:'—'|default:'—' }} appearances</p>
       {% if seasons %}
       <form method="get" action="{% url 'player_detail' player.slug %}" class="mt-4">
         <label for="player-season">Season</label>

@@ -55,6 +55,14 @@ public ranks. After replay begins, the baseline is the preceding same-formula we
 snapshot, not a same-date formula revision or a daily simulation. Until a real
 earlier cutoff exists, show `—` with an explanatory tooltip, not `NEW`. A player
 absent from a real baseline is `NEW`; a changed award category is `NEW category`.
+The homepage and player page keep the linked category-change info icon for three
+forward published ranking updates, counting the change as update one and removing
+it on update four. Normal movement still uses its existing baseline. On the player
+page the icon sits beside `NEW category` when present, otherwise beside the role.
+Failed imports, unpublished attempts, backdated replay publications and same-cutoff
+republications do not consume the window. Same-cutoff category corrections can
+start a new window. Historical pages use only publications available when their
+selected snapshot was published; this display never edits frozen records.
 Existing frozen entry movement fields remain unchanged. Player charts use distinct
 dated weekly cutoffs plus the selected terminal publication, removing coincident
 formula-revision points and keeping the existing season-long SVG bounds.

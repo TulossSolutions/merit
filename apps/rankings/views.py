@@ -9,7 +9,7 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
 from apps.football.models import Player, Position, Season
 from apps.rankings.models import RankingEntry
-from apps.rankings.services.queries import entries,latest_snapshot,present_movement
+from apps.rankings.services.queries import entries,latest_snapshot,present_movement,present_category_notices
 from apps.scoring.models import PlayerSeasonScore
 from apps.scoring.services.minutes import displayed_minutes
 from apps.ingestion.models import PlayerIdentityAlias
@@ -78,6 +78,7 @@ def player_detail(request,slug):
         if entry is None and season_history: entry=season_history[0]
     if entry: snapshot=entry.snapshot
     if entry: present_movement([entry],snapshot)
+    if entry: present_category_notices([entry],snapshot)
     selected_season=snapshot.season if snapshot else None
     score=None
     if entry:

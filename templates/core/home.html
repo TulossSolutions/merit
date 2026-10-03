@@ -60,7 +60,7 @@
 
                 <div class="leader-player">
                   <a href="{% url 'player_detail' entry.player.slug %}?season={{ snapshot.season.slug }}">{{ entry.player.name }}</a>
-                  {% if entry.movement_state == 'new_category' %}{% include 'components/category_notice.html' %}{% endif %}
+                  {% if entry.category_change_notice %}{% include 'components/category_notice.html' %}{% endif %}
                 </div>
 
                 <div class="leader-score">
