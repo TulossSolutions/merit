@@ -6,19 +6,7 @@
   <p class="home-deck">Compare ranked players using the same published score breakdown and context.</p>
 </section>
 
-<form class="compare-form" method="get" hx-get="{% url 'compare' %}" hx-target="#comparison-region" hx-push-url="true">
-  <label class="text-xs font-bold" for="player-a">Player A</label>
-  <select id="player-a" name="a">
-    <option value="">Select player</option>
-    {% for player in players %}<option value="{{ player.slug }}" {% if a and player.pk == a.pk %}selected{% endif %}>{{ player.name }} — {{ player.get_primary_position_display }}</option>{% endfor %}
-  </select>
-  <label class="text-xs font-bold" for="player-b">Player B</label>
-  <select id="player-b" name="b">
-    <option value="">Select player</option>
-    {% for player in players %}<option value="{{ player.slug }}" {% if b and player.pk == b.pk %}selected{% endif %}>{{ player.name }} — {{ player.get_primary_position_display }}</option>{% endfor %}
-  </select>
-  <button class="button" type="submit">Compare</button>
-</form>
+{% include 'players/partials/compare_workspace.html' %}
 
 <div class="mt-8 max-w-xl">
   <label class="block mb-2 text-xs font-bold" for="player-search">Find a player</label>
@@ -26,5 +14,4 @@
   <div id="player-search-results" aria-live="polite"></div>
 </div>
 
-<div id="comparison-region" class="mt-10" aria-live="polite">{% include 'players/partials/comparison.html' %}</div>
 {% endblock %}

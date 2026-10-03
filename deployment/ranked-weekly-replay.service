@@ -9,6 +9,8 @@ Group=www-data
 WorkingDirectory=/var/www/x.tuloss.com/ranked
 EnvironmentFile=/var/www/x.tuloss.com/ranked/.env
 Environment=DJANGO_SETTINGS_MODULE=config.settings.prod
+Environment=MERIT_PRODUCTION_ALERTS=True
 ExecStart=/var/www/x.tuloss.com/ranked/.venv/bin/python manage.py replay_weekly_rankings --max-runtime 1800 --max-weeks 20
+ExecStopPost=-/var/www/x.tuloss.com/ranked/.venv/bin/python manage.py notify_production_job --job weekly-ranking-replay
 Nice=10
 TimeoutStartSec=1h

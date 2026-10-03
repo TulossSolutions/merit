@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import Http404, HttpResponseRedirect, HttpResponsePermanentRedirect
@@ -9,11 +11,33 @@ from apps.football.models import Player, Position, Season
 from apps.rankings.models import RankingEntry
 from apps.rankings.services.queries import entries,latest_snapshot,present_movement
 from apps.scoring.models import PlayerSeasonScore
+from apps.scoring.services.minutes import displayed_minutes
 from apps.ingestion.models import PlayerIdentityAlias
 
 SLUGS={"attackers":Position.FWD,"midfielders":Position.MID,"defenders":Position.DEF,"goalkeepers":Position.GK}
 HEADLINES={Position.FWD:["goals_per90","assists_per90","shots_on_target_per90"],Position.MID:["key_passes_per90","interceptions_per90","pass_accuracy"],Position.DEF:["duel_win_rate","interceptions_per90","tackles_per90"],Position.GK:["save_percentage","saves_per90","clean_sheet_rate"]}
 def ranking_index(request): return HttpResponseRedirect(reverse("ranking",args=["attackers"]))
+
+def comparison_highlights(rows):
+    for row in rows:
+        if row:
+            row.compare_best_score=False
+            row.compare_best_metric_keys=set()
+    if len(rows)!=2 or not all(rows): return
+    scores=[Decimal(str(row.score)) for row in rows]
+    best_score=max(scores)
+    for row,value in zip(rows,scores): row.compare_best_score=value==best_score
+    shared=set(rows[0].metric_breakdown) & set(rows[1].metric_breakdown)
+    for key in shared:
+        try:
+            values=[Decimal(str(row.metric_breakdown[key]["percentile"])) for row in rows]
+        except (InvalidOperation,KeyError,TypeError,ValueError):
+            continue
+        if any(row.metric_breakdown[key].get("percentile") is None for row in rows): continue
+        best=max(values)
+        for row,value in zip(rows,values):
+            if value==best: row.compare_best_metric_keys.add(key)
+
 @cache_page(300)
 @vary_on_headers("HX-Request")
 def ranking(request,position_slug):
@@ -82,14 +106,22 @@ def player_detail(request,slug):
         chart_dates=[chart_points[index] for index in dict.fromkeys((0,len(chart_points)//2,len(chart_points)-1))]
     required_minutes=selected_season.eligibility_minutes(snapshot.cutoff_at.date()) if score else None
     achievements=entry.context_summary.get("achievements",{}) if entry else {}
+    minutes_breakdown=displayed_minutes(entry.context_summary,entry.minutes) if entry else []
     return render(request,"players/detail.html",{"player":player,"entry":entry,"score":score,"achievements":achievements,
         "season_history":season_history,"seasons":[item.snapshot.season for item in season_history],"selected_season":selected_season,
+        "minutes_breakdown":minutes_breakdown,
         "chart_points":chart_points,"chart_dates":chart_dates,"chart_ranks":chart_ranks,"required_minutes":required_minutes,"page_title":player.name})
 def compare(request):
-    a=Player.objects.exclude(provider_id="0").filter(slug=request.GET.get("a","")).first(); b=Player.objects.exclude(provider_id="0").filter(slug=request.GET.get("b","")).first(); snapshot=latest_snapshot(); rows=[]
+    season_slug=request.GET.get("season"); season=get_object_or_404(Season,slug=season_slug,is_published=True) if season_slug else None
+    snapshot=latest_snapshot(season); players=Player.objects.none()
+    if snapshot: players=Player.objects.exclude(provider_id="0").filter(ranking_entries__snapshot=snapshot).distinct().order_by("name")
+    a=players.filter(slug=request.GET.get("a","")).first(); b=players.filter(slug=request.GET.get("b","")).first(); rows=[]
     for player in (a,b): rows.append(RankingEntry.objects.filter(snapshot=snapshot,player=player).select_related("player","team").first() if player and snapshot else None)
-    template="players/partials/comparison.html" if request.headers.get("HX-Request")=="true" else "players/compare.html"
-    return render(request,template,{"snapshot":snapshot,"a":a,"b":b,"rows":rows,"players":Player.objects.exclude(provider_id="0").filter(ranking_entries__snapshot=snapshot).distinct().order_by("name") if snapshot else Player.objects.none(),"different_positions":a and b and a.primary_position!=b.primary_position,"page_title":"Compare players"})
+    comparison_highlights(rows)
+    template="players/partials/compare_workspace.html" if request.headers.get("HX-Request")=="true" else "players/compare.html"
+    return render(request,template,{"snapshot":snapshot,"a":a,"b":b,"rows":rows,"players":players,
+        "seasons":Season.objects.filter(is_published=True).order_by("-starts_on"),
+        "different_positions":a and b and a.primary_position!=b.primary_position,"page_title":"Compare players"})
 def player_search(request):
     q=request.GET.get("q","").strip(); qs=Player.objects.none()
     if len(q)>=2:

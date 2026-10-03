@@ -6,6 +6,7 @@ from apps.ingestion.services.positions import PROFILE_SOURCES, award_positions
 from apps.football.models import Competition, PlayerFixture, Position
 from apps.scoring.models import PlayerSeasonScore
 from .achievements import prepare_season_achievements,season_achievement
+from .minutes import competition_minutes
 from apps.football.award_periods import fixtures_for_award_period
 
 logger=logging.getLogger(__name__)
@@ -91,6 +92,7 @@ def recompute_scores(season,formula,as_of):
                 final=final*(1-weight)+achievement*weight
             contexts=[x for x in items if x.context_factor is not None]
             summary={"average_opponent_elo":float(sum((x.opponent_elo_before for x in contexts),Decimal("0"))/len(contexts)) if contexts else None,"average_context_factor":float(sum((x.context_factor for x in contexts),Decimal("0"))/len(contexts)) if contexts else None,"domestic_minutes":sum(x.minutes for x in items if x.fixture.competition_season.competition.competition_type==Competition.Type.DOMESTIC_LEAGUE),"ucl_minutes":sum(x.minutes for x in items if x.fixture.competition_season.competition.competition_type==Competition.Type.UCL)}
+            summary["competition_minutes"]=competition_minutes(items)
             if configs.get("achievements"):
                 summary["achievements"]={**achievement_breakdown,"score":str(achievement) if achievement is not None else None}
             if profile_based:

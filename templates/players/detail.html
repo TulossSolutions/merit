@@ -7,7 +7,7 @@
       <p class="eyebrow">{% if entry %}{{ entry.get_position_display }}{% else %}{{ player.get_primary_position_display }}{% endif %}</p>
       <h1>{{ player.name }}</h1>
       <p class="mt-2 text-sm text-muted">{{ entry.team.name|default:'Team unavailable' }}{% if player.nationality_code %} · {{ player.nationality_code }}{% endif %}</p>
-      <p class="mt-2 text-xs text-muted">{% if entry %}{% include 'components/movement.html' %} · {% endif %}{{ score.minutes|default:0 }} minutes · {{ score.appearances|default_if_none:'—'|default:'—' }} appearances</p>
+      <p class="mt-2 text-xs text-muted">{% if entry %}{% include 'components/movement.html' %}{% if entry.movement_state == 'new_category' %}{% include 'components/category_notice.html' %}{% endif %} · {% endif %}{{ score.minutes|default:0 }} minutes · {{ score.appearances|default_if_none:'—'|default:'—' }} appearances</p>
       {% if seasons %}
       <form method="get" action="{% url 'player_detail' player.slug %}" class="mt-4">
         <label for="player-season">Season</label>
@@ -44,12 +44,20 @@
   <div class="mt-10">
     <p class="eyebrow">Context</p>
     <h2>Match environment</h2>
-    <dl class="context-grid">
+    <dl class="context-grid lg:grid-cols-2">
       <div><dt><abbr title="Average pre-match Elo rating of the opponents faced. Higher values mean stronger opponents.">Average opponent Elo</abbr></dt><dd>{{ score.context_summary.average_opponent_elo|default_if_none:'—'|floatformat:1 }}</dd></div>
       <div><dt><abbr title="Average multiplier applied to context-adjusted counting metrics, reflecting opponent strength, competition and league context; 1.000 is neutral.">Average context factor</abbr></dt><dd>{{ score.context_summary.average_context_factor|default_if_none:'—'|floatformat:3 }}</dd></div>
-      <div><dt>Domestic minutes</dt><dd>{{ score.context_summary.domestic_minutes }}</dd></div>
-      <div><dt>Champions League minutes</dt><dd>{{ score.context_summary.ucl_minutes }}</dd></div>
     </dl>
+    <div class="table-wrap mt-6"><table aria-label="Minutes by covered competition">
+      <thead><tr><th scope="col">Competition</th><th scope="col">Minutes</th></tr></thead>
+      {% for group in minutes_breakdown %}
+      <tbody>
+        <tr><th scope="rowgroup" colspan="2">{{ group.label }}</th></tr>
+        {% for row in group.rows %}<tr><td>{{ row.competition }}</td><td>{{ row.minutes }}</td></tr>{% endfor %}
+      </tbody>
+      {% endfor %}
+      <tfoot><tr><th scope="row">Total minutes</th><td>{{ score.minutes }}</td></tr></tfoot>
+    </table></div>
   </div>
 </section>
 {% else %}

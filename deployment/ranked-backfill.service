@@ -9,5 +9,7 @@ User=contabo
 Group=www-data
 WorkingDirectory=/var/www/x.tuloss.com/ranked
 EnvironmentFile=/var/www/x.tuloss.com/ranked/.env
+Environment=MERIT_PRODUCTION_ALERTS=True
 ExecStart=/var/www/x.tuloss.com/ranked/.venv/bin/python manage.py backfill_archive --daily-call-budget 7000 --reserve 500 --request-interval 0.25 --max-runtime 21600
+ExecStopPost=-/var/www/x.tuloss.com/ranked/.venv/bin/python manage.py notify_production_job --job archive-backfill
 TimeoutStartSec=8h

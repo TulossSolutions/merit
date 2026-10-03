@@ -5,13 +5,13 @@
     {% if row %}
       <div class="flex items-start justify-between gap-4 pb-4 border-b border-line">
         <div><p class="eyebrow">#{{ row.rank }} in role</p><h2>{{ row.player.name }}</h2><p class="mt-1 text-xs text-muted">{{ row.minutes }} minutes</p></div>
-        <strong class="text-3xl font-black tabular-nums">{{ row.score|floatformat:2 }}</strong>
+        <strong class="text-3xl font-black tabular-nums{% if row.compare_best_score %} compare-best-value{% endif %}"{% if row.compare_best_score %} data-best-value="true"{% endif %}>{% if row.compare_best_score %}<span class="sr-only">Best score: </span>{% endif %}{{ row.score|floatformat:2 }}</strong>
       </div>
       <dl class="mt-4 divide-y divide-line">
         {% for key,metric in row.metric_breakdown.items %}
-        <div class="grid grid-cols-[1fr_auto] gap-4 py-2.5 text-sm">
+        <div class="grid grid-cols-[1fr_auto] gap-4 py-2.5 text-sm{% if key in row.compare_best_metric_keys %} compare-best{% endif %}"{% if key in row.compare_best_metric_keys %} data-best-value="true"{% endif %}>
           <dt>{{ metric.label }}</dt>
-          <dd class="text-right tabular-nums">{% if metric.raw_value != None %}{{ metric.raw_value|floatformat:2 }}{% else %}—{% endif %} <span class="text-muted">· p{% if metric.percentile != None %}{{ metric.percentile|floatformat:1 }}{% else %}—{% endif %} · w {{ metric.effective_weight|floatformat:2 }}</span></dd>
+          <dd class="text-right tabular-nums">{% if metric.raw_value != None %}{{ metric.raw_value|floatformat:2 }}{% else %}—{% endif %} <span class="text-muted">· p{% if metric.percentile != None %}{{ metric.percentile|floatformat:1 }}{% else %}—{% endif %} · w {{ metric.effective_weight|floatformat:2 }}</span>{% if key in row.compare_best_metric_keys %}<span class="compare-best-marker">Best</span>{% endif %}</dd>
         </div>
         {% endfor %}
         <div class="grid grid-cols-[1fr_auto] gap-4 py-2.5 text-sm"><dt>Average opponent Elo</dt><dd class="tabular-nums">{{ row.context_summary.average_opponent_elo|default_if_none:'—'|floatformat:1 }}</dd></div>

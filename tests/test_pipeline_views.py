@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import pytest
 from django.core.cache import cache
 from django.core.management import call_command
@@ -37,6 +37,11 @@ def test_full_pipeline_has_four_cohorts_and_breakdown(pipeline):
     assert snapshot.season.is_published is True
     assert set(snapshot.entries.values_list("position", flat=True)) == {Position.GK, Position.DEF, Position.MID, Position.FWD}
     assert all(score.metric_breakdown for score in scores)
+    for score in scores:
+        detail=score.context_summary["competition_minutes"]
+        assert sum(item["minutes"] for item in detail)==score.minutes
+        entry=snapshot.entries.filter(player=score.player,position=score.position).first()
+        if entry: assert entry.context_summary["competition_minutes"]==detail
     defender = snapshot.entries.filter(position=Position.DEF).first()
     assert defender.metric_breakdown["tackles_per90"]["active"] is True
     assert defender.metric_breakdown["tackles_per90"]["raw_value"] is not None
@@ -102,6 +107,53 @@ def test_provider_id_zero_players_are_excluded_from_public_lists(pipeline):
         response=client.get(url)
         assert response.status_code==200
         assert b"Unverified Placeholder" not in response.content
+
+def test_compare_season_selector_uses_that_seasons_snapshot_and_player_pool(pipeline):
+    current,_=pipeline
+    selected=list(current.entries.select_related("player","team").order_by("rank")[:2])
+    current_only=current.entries.select_related("player").order_by("rank")[2]
+    historical=Season.objects.create(name="2024/25",slug="2024-25",starts_on=date(2024,8,1),
+        ends_on=date(2025,5,31),is_published=True)
+    cutoff=datetime(2025,7,1,tzinfo=timezone.utc)
+    old=RankingSnapshot.objects.create(season=historical,formula=current.formula,cutoff_at=cutoff,
+        published_at=cutoff,is_public=True)
+    for rank,item in enumerate(selected,1):
+        RankingEntry.objects.create(snapshot=old,player=item.player,team=item.team,position=item.position,
+            rank=rank,score=item.score,minutes=item.minutes,metric_breakdown=item.metric_breakdown,
+            context_summary=item.context_summary)
+    params=f"?season=2024-25&a={selected[0].player.slug}&b={selected[1].player.slug}"
+    response=Client().get(f"/compare/{params}")
+    assert response.status_code==200 and response.context["snapshot"]==old
+    assert b'<option value="2024-25" selected>' in response.content
+    assert response.content.count(b" selected")>=3
+    assert current_only.player.name.encode() not in response.content
+    fragment=Client().get(f"/compare/{params}",HTTP_HX_REQUEST="true")
+    assert fragment.status_code==200 and b'id="compare-workspace"' in fragment.content
+    assert b"<html" not in fragment.content and fragment.context["snapshot"]==old
+
+def test_compare_highlights_higher_frozen_percentiles_and_score_with_ties(pipeline):
+    snapshot,_=pipeline
+    rows=list(snapshot.entries.select_related("player").order_by("rank")[:2])
+    breakdowns=[
+        {"attack":{"label":"Attack","raw_value":2,"percentile":90,"effective_weight":0.5},
+         "discipline":{"label":"Discipline","raw_value":1,"percentile":60,"effective_weight":0.3},
+         "tie":{"label":"Tie","raw_value":5,"percentile":50,"effective_weight":0.2}},
+        {"attack":{"label":"Attack","raw_value":3,"percentile":80,"effective_weight":0.5},
+         "discipline":{"label":"Discipline","raw_value":0,"percentile":70,"effective_weight":0.3},
+         "tie":{"label":"Tie","raw_value":4,"percentile":50,"effective_weight":0.2}},
+    ]
+    for index,row in enumerate(rows):
+        row.score=80-index*10; row.metric_breakdown=breakdowns[index]
+        row.save(update_fields=["score","metric_breakdown"])
+    params=f"?season={snapshot.season.slug}&a={rows[0].player.slug}&b={rows[1].player.slug}"
+    response=Client().get(f"/compare/{params}")
+    compared=response.context["rows"]
+    assert compared[0].compare_best_score and not compared[1].compare_best_score
+    assert compared[0].compare_best_metric_keys=={"attack","tie"}
+    assert compared[1].compare_best_metric_keys=={"discipline","tie"}
+    assert response.content.count(b'data-best-value="true"')==5
+    one=Client().get(f"/compare/?season={snapshot.season.slug}&a={rows[0].player.slug}")
+    assert b'data-best-value="true"' not in one.content
 
 def test_inactive_existing_goal_rate_is_displayed_but_zero_is_dash(pipeline):
     snapshot,_=pipeline

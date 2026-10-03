@@ -49,3 +49,13 @@ DEFAULT_SEASON_SLUG = os.getenv("DEFAULT_SEASON_SLUG", "2026-27")
 PUBLIC_RANKING_WEEKDAY = int(os.getenv("PUBLIC_RANKING_WEEKDAY", "0"))
 PUBLIC_RANKING_HOUR_UTC = int(os.getenv("PUBLIC_RANKING_HOUR_UTC", "6"))
 CACHE_TTL = 86400
+MERIT_PRODUCTION_ALERTS = os.getenv("MERIT_PRODUCTION_ALERTS", "False").lower() == "true"
+MERIT_ALERT_EMAIL = os.getenv("MERIT_ALERT_EMAIL", "hello@tuloss.com")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "25"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "False").lower() == "true"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "False").lower() == "true"
+EMAIL_TIMEOUT = 15
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Merit <merit@tuloss.com>")

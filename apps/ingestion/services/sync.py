@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+from dataclasses import replace
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -17,11 +18,21 @@ logger=logging.getLogger(__name__)
 
 @transaction.atomic
 def ingest_fixture_bundle(bundle, competition_season, provider="mock", request_path="", retain_raw=True):
+    invalid_playing_rows=[]
+    if provider=="api_football":
+        invalid_playing_rows=[row for row in bundle.participations if str(row.player.id)=="0" and row.minutes>0]
+        valid_rows=tuple(row for row in bundle.participations if str(row.player.id)!="0")
+        bundle=replace(bundle,participations=valid_rows)
     aliases=resolve_provider_aliases(provider,[row.player.id for row in bundle.participations])
     identities=[aliases[str(row.player.id)].provider_id if str(row.player.id) in aliases else str(row.player.id)
         for row in bundle.participations]
     if len(identities)!=len(set(identities)):
         raise ValidationError("Duplicate canonical player in fixture bundle; identity evidence review required")
+    if invalid_playing_rows:
+        review={"reason":"playing_player_without_provider_identity", "policy":"whole_fixture_unavailable",
+            "players":[{"name":row.player.name,"team_id":row.team_id,"minutes":row.minutes} for row in invalid_playing_rows]}
+        bundle=replace(bundle,participations=(),raw_payload={**bundle.raw_payload,"merit_identity_review":review})
+        logger.warning("fixture_player_identity_unavailable fixture=%s affected_players=%s",bundle.fixture.id,len(invalid_playing_rows))
     if retain_raw:
         raw=json.dumps(bundle.raw_payload,sort_keys=True,separators=(",",":"),default=str).encode()
         RawProviderPayload.objects.create(provider=provider,resource_type="fixture",provider_resource_id=bundle.fixture.id,request_path=request_path,payload=bundle.raw_payload,payload_sha256=hashlib.sha256(raw).hexdigest(),http_status=200)

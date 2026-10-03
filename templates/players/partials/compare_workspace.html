@@ -1,0 +1,27 @@
+<div id="compare-workspace">
+  <form class="compare-form" method="get" hx-get="{% url 'compare' %}" hx-target="#compare-workspace" hx-swap="outerHTML" hx-push-url="true">
+    <div>
+      <label class="text-xs font-bold" for="compare-season">Season</label>
+      <select id="compare-season" name="season" onchange="this.form.requestSubmit()">
+        {% for season in seasons %}<option value="{{ season.slug }}"{% if snapshot and season.pk == snapshot.season_id %} selected{% endif %}>{{ season.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="text-xs font-bold" for="player-a">Player A</label>
+      <select id="player-a" name="a">
+        <option value="">Select player</option>
+        {% for player in players %}<option value="{{ player.slug }}"{% if a and player.pk == a.pk %} selected{% endif %}>{{ player.name }} — {{ player.get_primary_position_display }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="text-xs font-bold" for="player-b">Player B</label>
+      <select id="player-b" name="b">
+        <option value="">Select player</option>
+        {% for player in players %}<option value="{{ player.slug }}"{% if b and player.pk == b.pk %} selected{% endif %}>{{ player.name }} — {{ player.get_primary_position_display }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="button" type="submit">Compare</button>
+  </form>
+
+  <div id="comparison-region" class="mt-10" aria-live="polite">{% include 'players/partials/comparison.html' %}</div>
+</div>

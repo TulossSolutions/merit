@@ -57,6 +57,13 @@
   .leader-player { @apply min-w-0; }
   .leader-player a { @apply block truncate no-underline font-bold text-sm hover:underline; }
   .leader-player span { @apply block mt-0.5 uppercase tracking-[.12em] text-[8px] font-bold text-muted; }
+  .leader-player:has(.category-info) { @apply flex items-center gap-1; }
+  .category-info,.leader-player .category-info { @apply relative inline-flex shrink-0 m-0 normal-case tracking-normal text-xs font-normal; }
+  .category-info-icon { @apply cursor-help text-muted px-1 focus-visible:outline-2 focus-visible:outline-accent; }
+  .category-info-tooltip,.leader-player .category-info-tooltip { @apply invisible absolute z-20 top-full right-0 pt-2 px-3 pb-3 bg-white border border-line shadow-md w-56 text-xs leading-5 normal-case tracking-normal font-normal m-0; }
+  .category-info:hover .category-info-tooltip,.category-info:focus-within .category-info-tooltip { @apply visible; }
+  .category-info-tooltip a,.leader-player .category-info-tooltip a { @apply inline text-xs font-normal underline whitespace-normal; }
+  .player-head .category-info-tooltip { @apply left-0 right-auto; }
   .leader-score { @apply flex items-baseline gap-2 text-right; }
   .leader-score strong { @apply tabular-nums text-base md:text-lg font-black tracking-tight; }
   .leader-score span { @apply text-[10px] font-black tabular-nums; }
@@ -104,7 +111,11 @@
   .context-grid dt { @apply text-[9px] uppercase tracking-[.12em] font-bold text-muted; }
   .context-grid dd { @apply mt-1 text-xl font-black tabular-nums; }
 
-  .compare-form { @apply grid sm:grid-cols-[auto_1fr_auto_1fr_auto] items-end gap-3 my-5; }
+  .compare-form { @apply grid sm:grid-cols-2 lg:grid-cols-[minmax(8rem,.65fr)_minmax(12rem,1fr)_minmax(12rem,1fr)_auto] items-end gap-3 my-5; }
+  .compare-form > div { @apply grid gap-1; }
+  .compare-best { @apply -mx-2 px-2 bg-accent/10 border-l-2 border-accent; }
+  .compare-best-value { @apply bg-accent/20 px-2 py-1; }
+  .compare-best-marker { @apply ml-2 text-[9px] uppercase tracking-[.12em] font-black text-ink; }
   input,select { @apply bg-white border border-line px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-accent; }
   .prose { @apply max-w-3xl space-y-5 leading-7; }
   .prose h2,.prose h3 { @apply mt-8; }
