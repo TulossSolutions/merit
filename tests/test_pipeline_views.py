@@ -17,7 +17,7 @@ pytestmark = pytest.mark.django_db
 def test_methodology_links_to_github():
     response = Client().get("/methodology/")
     assert response.status_code == 200
-    assert b'href="https://github.com/TulossSolutions/performanceawards"' in response.content
+    assert b'href="https://github.com/TulossSolutions/merit"' in response.content
     assert b"View source on GitHub" in response.content
 
 @pytest.fixture

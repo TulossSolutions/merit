@@ -50,7 +50,7 @@ PUBLIC_RANKING_WEEKDAY = int(os.getenv("PUBLIC_RANKING_WEEKDAY", "0"))
 PUBLIC_RANKING_HOUR_UTC = int(os.getenv("PUBLIC_RANKING_HOUR_UTC", "6"))
 CACHE_TTL = 86400
 MERIT_PRODUCTION_ALERTS = os.getenv("MERIT_PRODUCTION_ALERTS", "False").lower() == "true"
-MERIT_ALERT_EMAIL = os.getenv("MERIT_ALERT_EMAIL", "hello@tuloss.com")
+MERIT_ALERT_EMAIL = os.getenv("MERIT_ALERT_EMAIL", "merit@tuloss.com")
 EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "25"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")

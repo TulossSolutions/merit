@@ -2,6 +2,8 @@
 
 **No votes. Just performance.**
 
+[Website](https://x.tuloss.com/merit/) · [Source](https://github.com/TulossSolutions/merit) · [Releases](https://github.com/TulossSolutions/merit/releases)
+
 A server-rendered Django MVP that publishes explainable weekly GK, DEF, MID, and FWD rankings from normalized fixture statistics. Scores are deterministic, formula-versioned, and precomputed; public requests never contact the football provider or calculate rankings.
 
 ![Merit homepage showing the 2024/25 football player rankings](docs/homepage.png)
@@ -10,7 +12,7 @@ A server-rendered Django MVP that publishes explainable weekly GK, DEF, MID, and
 
 Merit exists to make football player rankings understandable and reproducible. It turns match statistics into weekly, position-specific rankings using explicit inputs, consistent rules, and versioned formulas—without human votes, opaque provider ratings, or AI-generated scores. The goal is not to remove judgment from football analysis, but to make every judgment in the model visible and open to scrutiny.
 
-Read the full [project manifesto](docs/manifest.md).
+Read the full [project manifesto (V2)](docs/manifest_v2.md).
 
 ## Requirements
 

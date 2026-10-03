@@ -22,7 +22,7 @@ def failed_archive():
 @override_settings(MERIT_PRODUCTION_ALERTS=True, EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 def test_failure_email_plain_language_recipient_dedup_and_new_failure_cycle(failed_archive):
     assert notify_job("archive-backfill") == 1
-    assert mail.outbox[0].to == ["hello@tuloss.com"]
+    assert mail.outbox[0].to == ["merit@tuloss.com"]
     assert "Duplicate canonical player" in mail.outbox[0].body
     assert "New data or ranking history may be delayed" in mail.outbox[0].body
     assert notify_job("archive-backfill") == 0

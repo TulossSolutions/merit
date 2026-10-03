@@ -1,7 +1,7 @@
 # Production job alerts
 
 Archive import and weekly replay send plain-language incident emails to
-`hello@tuloss.com` when a native job fails, a ranking publication is rejected,
+`merit@tuloss.com` when a native job fails, a ranking publication is rejected,
 or a match is quarantined because a playing participant has provider ID 0.
 Emails explain the issue and its impact. No API calls are made by the alert command.
 
