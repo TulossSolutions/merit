@@ -81,7 +81,7 @@ def test_home_shows_ranking_movement_next_to_score(pipeline):
     content=Client().get("/").content
     assert b'images/merit_logo_full.png' in content
     assert b'images/merit_logo_favicon.png' in content
-    assert b'dist/app.css?v=merit-20260923' in content
+    assert b'dist/app.css?v=merit-20261003' in content
     nav = content.split(b'<nav aria-label="Main navigation">', 1)[1].split(b'</nav>', 1)[0]
     assert all(label not in nav for label in (b"Attackers", b"Midfielders", b"Defenders", b"Goalkeepers"))
     assert all(label in nav for label in (b"Compare", b"Methodology", b"Roadmap", b"Manifesto"))
