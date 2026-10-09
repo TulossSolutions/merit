@@ -86,7 +86,7 @@ def test_home_shows_ranking_movement_next_to_score(pipeline):
     assert all(label not in nav for label in (b"Attackers", b"Midfielders", b"Defenders", b"Goalkeepers"))
     assert all(label in nav for label in (b"Compare", b"Methodology", b"Roadmap", b"Manifesto"))
     assert b"No votes. Just performance." in content
-    assert b'<meta name="description" content="No votes. Just performance.">' in content
+    assert b'Discover Merit&#x27;s 2026/27 football leaders by position.' in content
     assert "Merit — No votes. Just performance.".encode() in content
     assert b'aria-label="Up 2 places"' in content
 

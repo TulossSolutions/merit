@@ -1,15 +1,11 @@
 {% load static %}
 <!doctype html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ page_title|default:'Merit' }}</title>
-  <meta name="description" content="No votes. Just performance.">
-  <link rel="canonical" href="{{ request.build_absolute_uri }}">
-
-  <meta property="og:title" content="{{ page_title|default:'Merit' }}">
-  <meta property="og:description" content="No votes. Just performance.">
+  {% include 'components/seo_metadata.html' with meta_title=page_title|default:'Merit' meta_description=page_description|default:default_meta_description %}
 
   <link rel="icon" type="image/png" sizes="64x64" href="{% static 'images/merit_logo_favicon.png' %}">
   <link rel="stylesheet" href="{% static 'dist/app.css' %}?v=merit-20261003">

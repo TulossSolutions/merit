@@ -52,6 +52,9 @@ def ranking(request,position_slug):
             metric=next((entry.metric_breakdown.get(key) for entry in page if entry.metric_breakdown.get(key)),None); headline_labels.append(metric.get("label",key) if metric else key.replace("_"," ").title())
         for entry in page: entry.headline_metrics=[entry.metric_breakdown.get(key) for key in headline_keys]
     context={"snapshot":snapshot,"position":position,"position_slug":position_slug,"page":page,"headline_labels":headline_labels,"seasons":Season.objects.filter(is_published=True).order_by("-starts_on"),"page_title":f"{dict(Position.choices)[position]} rankings"}
+    season_label=f"{snapshot.season.name} " if snapshot else ""
+    context["page_description"]=(f"Explore Merit's {season_label}{dict(Position.choices)[position].lower()} football rankings. "
+        "Compare player scores, key statistics and weekly movement, with every score explained.")
     template="rankings/partials/ranking_content.html" if request.headers.get("HX-Request")=="true" else "rankings/ranking_page.html"
     return render(request,template,context)
 def player_detail(request,slug):
@@ -108,10 +111,14 @@ def player_detail(request,slug):
     required_minutes=selected_season.eligibility_minutes(snapshot.cutoff_at.date()) if score else None
     achievements=entry.context_summary.get("achievements",{}) if entry else {}
     minutes_breakdown=displayed_minutes(entry.context_summary,entry.minutes) if entry else []
+    description=(f"Explore {player.name}'s {selected_season.name} football performance on Merit: "
+        "positional rank, score breakdown, season history and ranking progression.") if entry else (
+        f"Explore {player.name}'s football profile on Merit, including available season rankings, "
+        "performance statistics and published ranking history.")
     return render(request,"players/detail.html",{"player":player,"entry":entry,"score":score,"achievements":achievements,
         "season_history":season_history,"seasons":[item.snapshot.season for item in season_history],"selected_season":selected_season,
         "minutes_breakdown":minutes_breakdown,
-        "chart_points":chart_points,"chart_dates":chart_dates,"chart_ranks":chart_ranks,"required_minutes":required_minutes,"page_title":player.name})
+        "chart_points":chart_points,"chart_dates":chart_dates,"chart_ranks":chart_ranks,"required_minutes":required_minutes,"page_title":player.name,"page_description":description})
 def compare(request):
     season_slug=request.GET.get("season"); season=get_object_or_404(Season,slug=season_slug,is_published=True) if season_slug else None
     snapshot=latest_snapshot(season); players=Player.objects.none()
@@ -120,9 +127,14 @@ def compare(request):
     for player in (a,b): rows.append(RankingEntry.objects.filter(snapshot=snapshot,player=player).select_related("player","team").first() if player and snapshot else None)
     comparison_highlights(rows)
     template="players/partials/compare_workspace.html" if request.headers.get("HX-Request")=="true" else "players/compare.html"
+    season_label=f"{snapshot.season.name} " if snapshot else ""
+    description=(f"Compare {a.name} and {b.name}: {season_label}football performance on Merit. "
+        "See scores, minutes and position-relative statistics side by side.") if a and b else (
+        f"Compare players' {season_label}football performance on Merit. "
+        "Select a season and players to explore scores, minutes and position-relative statistics side by side.")
     return render(request,template,{"snapshot":snapshot,"a":a,"b":b,"rows":rows,"players":players,
         "seasons":Season.objects.filter(is_published=True).order_by("-starts_on"),
-        "different_positions":a and b and a.primary_position!=b.primary_position,"page_title":"Compare players"})
+        "different_positions":a and b and a.primary_position!=b.primary_position,"page_title":"Compare players","page_description":description})
 def player_search(request):
     q=request.GET.get("q","").strip(); qs=Player.objects.none()
     if len(q)>=2:
